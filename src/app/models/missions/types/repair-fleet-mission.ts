@@ -4,7 +4,11 @@ import { ShipType } from '../../enums/ship-type';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
 import { resolveTargetDiplomaticStatus } from '../mission-context';
-import type { MissionLaunchContext, MissionPlannerContext, MissionResolutionContext } from '../mission-context';
+import type {
+  MissionLaunchContext,
+  MissionPlannerContext,
+  MissionResolutionContext,
+} from '../mission-context';
 import type { MissionResolutionResult } from '../mission-effect';
 
 export class RepairFleetMission extends FleetMission {
@@ -19,7 +23,7 @@ export class RepairFleetMission extends FleetMission {
       context.selectedOriginPlanet?.info.ownerId ?? null,
       context.selectedTargetPlanet?.info.ownerId ?? null,
       context.selection.ships,
-      context.diplomacyResolver ?? null
+      context.diplomacyResolver ?? null,
     );
     return checks;
   }
@@ -31,20 +35,24 @@ export class RepairFleetMission extends FleetMission {
       context.playerId,
       context.targetPlanet.info.ownerId,
       context.selection.ships,
-      context.diplomacyResolver ?? null
+      context.diplomacyResolver ?? null,
     );
     return checks;
   }
 
-  public override resolveWithoutEncounter(context: MissionResolutionContext): MissionResolutionResult {
+  public override resolveWithoutEncounter(
+    context: MissionResolutionContext,
+  ): MissionResolutionResult {
     if (!context.targetPlanet) {
-      return this.failedArrival('Repair mission failed because the target was no longer available on arrival.');
+      return this.failedArrival(
+        'Repair mission failed because the target was no longer available on arrival.',
+      );
     }
 
     const targetStatus = resolveTargetDiplomaticStatus(
       context.fleet.ownerId,
       context.targetPlanet.info.ownerId,
-      context.diplomacyResolver ?? null
+      context.diplomacyResolver ?? null,
     );
     if (targetStatus === DiplomaticStatus.WAR) {
       return this.failedArrival('Repair mission failed because the target was hostile on arrival.');
@@ -53,15 +61,19 @@ export class RepairFleetMission extends FleetMission {
     return {
       fleetOutcome: 'keep',
       resetCreatedAtTurn: true,
-      effects: [{
-        type: 'setFleetOrbitState',
-        state: FleetState.ORBITING,
-        orbitActivity: FleetOrbitActivity.MISSION_IN_PROGRESS
-      }],
-      reports: [{
-        kind: 'success',
-        body: `Repair mission established orbit over ${context.targetPlanet.basicInfo.name}.`
-      }]
+      effects: [
+        {
+          type: 'setFleetOrbitState',
+          state: FleetState.ORBITING,
+          orbitActivity: FleetOrbitActivity.MISSION_IN_PROGRESS,
+        },
+      ],
+      reports: [
+        {
+          kind: 'success',
+          body: `Repair mission established orbit over ${context.targetPlanet.basicInfo.name}.`,
+        },
+      ],
     };
   }
 
@@ -70,24 +82,34 @@ export class RepairFleetMission extends FleetMission {
     playerOwnerId: number | null,
     targetOwnerId: number | null,
     selection: MissionPlannerContext['selection']['ships'],
-    diplomacyResolver: MissionPlannerContext['diplomacyResolver'] | null
+    diplomacyResolver: MissionPlannerContext['diplomacyResolver'] | null,
   ): void {
     const targetStatus = resolveTargetDiplomaticStatus(
       playerOwnerId,
       targetOwnerId,
-      diplomacyResolver ?? null
+      diplomacyResolver ?? null,
     );
     if (targetOwnerId !== null && targetStatus === DiplomaticStatus.WAR) {
-      checks.push({ text: 'Repair mission target cannot be hostile.', severity: 'error' });
+      checks.push({
+        text: 'Repair mission target cannot be hostile.',
+        textKey: 'missionPlanner.checks.repairInvalidTarget',
+        severity: 'error',
+      });
     }
 
-    const repairDroneAmount = selection.reduce((total, entry) => (
-      entry.type === ShipType.REPAIR_DRONE
-        ? total + entry.undamagedAmount + entry.damagedAmount
-        : total
-    ), 0);
+    const repairDroneAmount = selection.reduce(
+      (total, entry) =>
+        entry.type === ShipType.REPAIR_DRONE
+          ? total + entry.undamagedAmount + entry.damagedAmount
+          : total,
+      0,
+    );
     if (repairDroneAmount <= 0) {
-      checks.push({ text: 'Select at least one Repair Drone.', severity: 'error' });
+      checks.push({
+        text: 'Select at least one Repair Drone.',
+        textKey: 'missionPlanner.checks.repairRequiresDrone',
+        severity: 'error',
+      });
     }
   }
 
@@ -97,7 +119,7 @@ export class RepairFleetMission extends FleetMission {
       nextState: FleetState.MISSION_FAILURE_RETURNING,
       resetCreatedAtTurn: true,
       effects: [],
-      reports: [{ kind: 'failure', body }]
+      reports: [{ kind: 'failure', body }],
     };
   }
 }

@@ -6,7 +6,11 @@ import { ShipPurpose } from '../../enums/ship-purpose';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
 import { resolveTargetDiplomaticStatus } from '../mission-context';
-import type { MissionLaunchContext, MissionPlannerContext, MissionResolutionContext } from '../mission-context';
+import type {
+  MissionLaunchContext,
+  MissionPlannerContext,
+  MissionResolutionContext,
+} from '../mission-context';
 import type { MissionResolutionResult } from '../mission-effect';
 import { ShipType } from '../../enums/ship-type';
 
@@ -24,7 +28,7 @@ export class BombardFleetMission extends FleetMission {
       context.selectedOriginPlanet?.info.ownerId ?? null,
       context.selectedTargetPlanet?.info.ownerId ?? null,
       context.selection.ships,
-      context.diplomacyResolver ?? null
+      context.diplomacyResolver ?? null,
     );
     return checks;
   }
@@ -36,23 +40,29 @@ export class BombardFleetMission extends FleetMission {
       context.playerId,
       context.targetPlanet.info.ownerId,
       context.selection.ships,
-      context.diplomacyResolver ?? null
+      context.diplomacyResolver ?? null,
     );
     return checks;
   }
 
-  public override resolveWithoutEncounter(context: MissionResolutionContext): MissionResolutionResult {
+  public override resolveWithoutEncounter(
+    context: MissionResolutionContext,
+  ): MissionResolutionResult {
     if (!context.targetPlanet) {
-      return this.failedArrival('Bombard mission failed because the target was no longer available on arrival.');
+      return this.failedArrival(
+        'Bombard mission failed because the target was no longer available on arrival.',
+      );
     }
 
     const targetStatus = resolveTargetDiplomaticStatus(
       context.fleet.ownerId,
       context.targetPlanet.info.ownerId,
-      context.diplomacyResolver ?? null
+      context.diplomacyResolver ?? null,
     );
     if (targetStatus !== DiplomaticStatus.WAR) {
-      return this.failedArrival('Bombard mission failed because the target was no longer hostile on arrival.');
+      return this.failedArrival(
+        'Bombard mission failed because the target was no longer hostile on arrival.',
+      );
     }
 
     return {
@@ -60,19 +70,25 @@ export class BombardFleetMission extends FleetMission {
       nextState: FleetState.RETURNING,
       resetCreatedAtTurn: true,
       effects: [],
-      reports: [{
-        kind: 'success',
-        body: `Bombard mission struck ${context.targetPlanet.basicInfo.name} and started the return flight.`
-      }]
+      reports: [
+        {
+          kind: 'success',
+          body: `Bombard mission struck ${context.targetPlanet.basicInfo.name} and started the return flight.`,
+        },
+      ],
     };
   }
 
-  public override resolveAfterEncounter(context: MissionResolutionContext): MissionResolutionResult {
+  public override resolveAfterEncounter(
+    context: MissionResolutionContext,
+  ): MissionResolutionResult {
     return this.resolveWithoutEncounter(context);
   }
 
   public override onBattleRetreat(_context: MissionResolutionContext): MissionResolutionResult {
-    return this.failedArrival('Bombard mission encountered hostile resistance and was forced to retreat.');
+    return this.failedArrival(
+      'Bombard mission encountered hostile resistance and was forced to retreat.',
+    );
   }
 
   private addBombardChecks(
@@ -80,19 +96,27 @@ export class BombardFleetMission extends FleetMission {
     playerOwnerId: number | null,
     targetOwnerId: number | null,
     selection: MissionPlannerContext['selection']['ships'],
-    diplomacyResolver: MissionPlannerContext['diplomacyResolver'] | null
+    diplomacyResolver: MissionPlannerContext['diplomacyResolver'] | null,
   ): void {
     const targetStatus = resolveTargetDiplomaticStatus(
       playerOwnerId,
       targetOwnerId,
-      diplomacyResolver ?? null
+      diplomacyResolver ?? null,
     );
     if (targetOwnerId === null || targetStatus !== DiplomaticStatus.WAR) {
-      checks.push({ text: 'Bombard mission target must be a hostile owned planet.', severity: 'error' });
+      checks.push({
+        text: 'Bombard mission target must be a hostile owned planet.',
+        textKey: 'missionPlanner.checks.bombardInvalidTarget',
+        severity: 'error',
+      });
     }
 
     if (!this.hasBomberShips(selection)) {
-      checks.push({ text: 'BOMBARD requires at least one Bomber ship.', severity: 'error' });
+      checks.push({
+        text: 'BOMBARD requires at least one Bomber ship.',
+        textKey: 'missionPlanner.checks.bombardRequiresBomber',
+        severity: 'error',
+      });
     }
   }
 
@@ -113,7 +137,7 @@ export class BombardFleetMission extends FleetMission {
       nextState: FleetState.MISSION_FAILURE_RETURNING,
       resetCreatedAtTurn: true,
       effects: [],
-      reports: [{ kind: 'failure', body }]
+      reports: [{ kind: 'failure', body }],
     };
   }
 }

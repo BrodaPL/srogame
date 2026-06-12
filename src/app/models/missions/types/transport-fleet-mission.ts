@@ -6,7 +6,11 @@ import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
 import { resolveTargetDiplomaticStatus } from '../mission-context';
-import type { MissionPlannerContext, MissionLaunchContext, MissionResolutionContext } from '../mission-context';
+import type {
+  MissionPlannerContext,
+  MissionLaunchContext,
+  MissionResolutionContext,
+} from '../mission-context';
 import type { MissionResolutionResult } from '../mission-effect';
 
 export class TransportFleetMission extends FleetMission {
@@ -21,16 +25,20 @@ export class TransportFleetMission extends FleetMission {
     const targetStatus = resolveTargetDiplomaticStatus(
       playerOwnerId,
       targetOwnerId,
-      context.diplomacyResolver ?? null
+      context.diplomacyResolver ?? null,
     );
 
     if (
-      targetOwnerId !== null
-      && targetStatus !== DiplomaticStatus.SELF
-      && targetStatus !== DiplomaticStatus.ALLIED
-      && targetStatus !== DiplomaticStatus.PEACE
+      targetOwnerId !== null &&
+      targetStatus !== DiplomaticStatus.SELF &&
+      targetStatus !== DiplomaticStatus.ALLIED &&
+      targetStatus !== DiplomaticStatus.PEACE
     ) {
-      checks.push({ text: 'Transport mission target must be one of your planets or a friendly planet.', severity: 'error' });
+      checks.push({
+        text: 'Transport mission target must be one of your planets or a friendly planet.',
+        textKey: 'missionPlanner.checks.transportInvalidTarget',
+        severity: 'error',
+      });
     }
 
     return checks;
@@ -41,17 +49,19 @@ export class TransportFleetMission extends FleetMission {
     const targetStatus = resolveTargetDiplomaticStatus(
       context.playerId,
       context.targetPlanet.info.ownerId,
-      context.diplomacyResolver ?? null
+      context.diplomacyResolver ?? null,
     );
     if (
-      context.targetPlanet.info.ownerId === null
-      || (
-        targetStatus !== DiplomaticStatus.SELF
-        && targetStatus !== DiplomaticStatus.ALLIED
-        && targetStatus !== DiplomaticStatus.PEACE
-      )
+      context.targetPlanet.info.ownerId === null ||
+      (targetStatus !== DiplomaticStatus.SELF &&
+        targetStatus !== DiplomaticStatus.ALLIED &&
+        targetStatus !== DiplomaticStatus.PEACE)
     ) {
-      checks.push({ text: 'Transport mission target must be one of your planets or a friendly planet.', severity: 'error' });
+      checks.push({
+        text: 'Transport mission target must be one of your planets or a friendly planet.',
+        textKey: 'missionPlanner.checks.transportInvalidTarget',
+        severity: 'error',
+      });
     }
 
     return checks;
@@ -63,49 +73,55 @@ export class TransportFleetMission extends FleetMission {
       nextState: FleetState.MISSION_FAILURE_RETURNING,
       resetCreatedAtTurn: true,
       effects: [],
-      reports: [{
-        kind: 'failure',
-        body: 'Transport mission encountered hostile ships, kept its undelivered cargo, and was forced to retreat after the battle.'
-      }]
+      reports: [
+        {
+          kind: 'failure',
+          body: 'Transport mission encountered hostile ships, kept its undelivered cargo, and was forced to retreat after the battle.',
+        },
+      ],
     };
   }
 
-  public override resolveWithoutEncounter(context: MissionResolutionContext): MissionResolutionResult {
+  public override resolveWithoutEncounter(
+    context: MissionResolutionContext,
+  ): MissionResolutionResult {
     if (!context.targetPlanet) {
       return {
         fleetOutcome: 'keep',
         nextState: FleetState.MISSION_FAILURE_RETURNING,
         resetCreatedAtTurn: true,
         effects: [],
-        reports: [{
-          kind: 'failure',
-          body: 'Transport mission failed because the target was no longer available on arrival.'
-        }]
+        reports: [
+          {
+            kind: 'failure',
+            body: 'Transport mission failed because the target was no longer available on arrival.',
+          },
+        ],
       };
     }
 
     const targetStatus = resolveTargetDiplomaticStatus(
       context.fleet.ownerId,
       context.targetPlanet.info.ownerId,
-      context.diplomacyResolver ?? null
+      context.diplomacyResolver ?? null,
     );
     if (
-      context.targetPlanet.info.ownerId === null
-      || (
-        targetStatus !== DiplomaticStatus.SELF
-        && targetStatus !== DiplomaticStatus.ALLIED
-        && targetStatus !== DiplomaticStatus.PEACE
-      )
+      context.targetPlanet.info.ownerId === null ||
+      (targetStatus !== DiplomaticStatus.SELF &&
+        targetStatus !== DiplomaticStatus.ALLIED &&
+        targetStatus !== DiplomaticStatus.PEACE)
     ) {
       return {
         fleetOutcome: 'keep',
         nextState: FleetState.MISSION_FAILURE_RETURNING,
         resetCreatedAtTurn: true,
         effects: [],
-        reports: [{
-          kind: 'failure',
-          body: 'Transport mission failed because the target was no longer friendly on arrival.'
-        }]
+        reports: [
+          {
+            kind: 'failure',
+            body: 'Transport mission failed because the target was no longer friendly on arrival.',
+          },
+        ],
       };
     }
 
@@ -115,12 +131,14 @@ export class TransportFleetMission extends FleetMission {
       resetCreatedAtTurn: true,
       effects: [
         { type: 'transferFleetCargoToPlanet', planetRef: 'target' },
-        { type: 'clearFleetCargo' }
+        { type: 'clearFleetCargo' },
       ],
-      reports: [{
-        kind: 'success',
-        body: `${context.fleet.missionType} mission completed successfully at ${context.targetPlanet.basicInfo.name}.`
-      }]
+      reports: [
+        {
+          kind: 'success',
+          body: `${context.fleet.missionType} mission completed successfully at ${context.targetPlanet.basicInfo.name}.`,
+        },
+      ],
     };
   }
 }

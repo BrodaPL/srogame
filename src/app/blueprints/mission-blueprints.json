@@ -3,7 +3,7 @@
     {
       "type": "ATTACK",
       "name": "Attack",
-      "description": "Attack hostile or passive planets, steal resources after victory, then return automatically.",
+      "description": "missionPlanner.missions.descriptions.ATTACK",
       "battleRoundsModifier": 0,
       "minimumFuelReserves": 2,
       "encounterLocationKinds": ["planetOrbit"],
@@ -21,7 +21,7 @@
     {
       "type": "MOVE",
       "name": "Move",
-      "description": "Relocate ships to your own planets, friendly orbit, or an unowned planet. Cargo is allowed.",
+      "description": "missionPlanner.missions.descriptions.MOVE",
       "battleRoundsModifier": -1,
       "minimumFuelReserves": 2,
       "encounterLocationKinds": ["planetOrbit"],
@@ -39,7 +39,7 @@
     {
       "type": "DEFEND",
       "name": "Guard",
-      "description": "Send a military fleet to non-hostile orbit. It stays there and joins the local defense when that orbit is attacked.",
+      "description": "missionPlanner.missions.descriptions.DEFEND",
       "battleRoundsModifier": -1,
       "minimumFuelReserves": 2,
       "encounterLocationKinds": ["planetOrbit"],
@@ -57,7 +57,7 @@
     {
       "type": "TRANSPORT",
       "name": "Transport",
-      "description": "Send resources and ships to your own or friendly planets, then return automatically.",
+      "description": "missionPlanner.missions.descriptions.TRANSPORT",
       "battleRoundsModifier": -1,
       "minimumFuelReserves": 2,
       "encounterLocationKinds": ["planetOrbit"],
@@ -75,7 +75,7 @@
     {
       "type": "ARMAMENT_DELIVERY",
       "name": "Armament Delivery",
-      "description": "Deliver resources, PLANETARY_BOMB units, and carried small ships to your own or allied planets, then return automatically.",
+      "description": "missionPlanner.missions.descriptions.ARMAMENT_DELIVERY",
       "battleRoundsModifier": -1,
       "minimumFuelReserves": 2,
       "encounterLocationKinds": ["planetOrbit"],
@@ -93,7 +93,7 @@
     {
       "type": "SPY",
       "name": "Spy",
-      "description": "Send only Spy Probes. Cargo is disabled for this mission.",
+      "description": "missionPlanner.missions.descriptions.SPY",
       "battleRoundsModifier": 0,
       "minimumFuelReserves": 1,
       "encounterLocationKinds": ["planetOrbit"],
@@ -111,7 +111,7 @@
     {
       "type": "BOMBARD",
       "name": "Bombard",
-      "description": "Fight through hostile orbit, strike buildings once with bombardment weapons, then return automatically.",
+      "description": "missionPlanner.missions.descriptions.BOMBARD",
       "battleRoundsModifier": 0,
       "minimumFuelReserves": 2,
       "encounterLocationKinds": ["planetOrbit"],
@@ -129,7 +129,7 @@
     {
       "type": "SIEGE",
       "name": "Siege",
-      "description": "Fight through hostile orbit, stay over the target, and continue bombardment every turn until the fleet leaves orbit.",
+      "description": "missionPlanner.missions.descriptions.SIEGE",
       "battleRoundsModifier": 0,
       "minimumFuelReserves": 2,
       "encounterLocationKinds": ["planetOrbit"],
@@ -147,7 +147,7 @@
     {
       "type": "REPAIR",
       "name": "Repair",
-      "description": "Move to a non-hostile planet or orbit and stay there until all friendly damage is repaired, then return automatically.",
+      "description": "missionPlanner.missions.descriptions.REPAIR",
       "battleRoundsModifier": -1,
       "minimumFuelReserves": 2,
       "encounterLocationKinds": ["planetOrbit"],
@@ -165,7 +165,7 @@
     {
       "type": "RECYCLE",
       "name": "Recycle",
-      "description": "Move to orbit, gather debris with recycle equipment each turn, and return once the fleet is full or the debris field is empty.",
+      "description": "missionPlanner.missions.descriptions.RECYCLE",
       "battleRoundsModifier": -1,
       "minimumFuelReserves": 2,
       "encounterLocationKinds": ["planetOrbit"],
@@ -183,7 +183,7 @@
     {
       "type": "COLONIZE",
       "name": "Colonize",
-      "description": "Send a Colonizer to an unowned planet.",
+      "description": "missionPlanner.missions.descriptions.COLONIZE",
       "battleRoundsModifier": 0,
       "minimumFuelReserves": 2,
       "encounterLocationKinds": ["planetOrbit"],
@@ -201,7 +201,7 @@
     {
       "type": "HOLD",
       "name": "Hold",
-      "description": "Keep a fleet parked in orbit without running mission logic until a new order is issued.",
+      "description": "missionPlanner.missions.descriptions.HOLD",
       "battleRoundsModifier": 0,
       "minimumFuelReserves": 0,
       "encounterLocationKinds": ["planetOrbit"],

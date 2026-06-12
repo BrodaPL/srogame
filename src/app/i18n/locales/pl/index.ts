@@ -19,6 +19,7 @@ import { productionPl } from './production.pl';
 import { researchesPl } from './researches.pl';
 import { settingsPl } from './settings.pl';
 import { setupPl } from './setup.pl';
+import { terminologyPl } from './terminology.pl';
 import { topMenuPl } from './top-menu.pl';
 
 export const plTranslations = {
@@ -43,5 +44,6 @@ export const plTranslations = {
   researches: researchesPl,
   settings: settingsPl,
   setup: setupPl,
+  terminology: terminologyPl,
   topMenu: topMenuPl,
 } as const;

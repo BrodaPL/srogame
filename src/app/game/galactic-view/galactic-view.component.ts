@@ -1493,23 +1493,34 @@ export class GalacticViewComponent implements OnInit {
     isCenter: boolean,
     noteText: string | null,
   ): string {
-    const noteSegment = noteText ? `\nNote: ${noteText}` : '';
+    const noteSegment = noteText
+      ? `\n${this.i18n.t('galactic.labels.tooltipNote', { value: noteText })}`
+      : '';
+    const coordinates = `${x},${y}`;
 
     if (isVoid) {
-      return `${x},${y} | Void${noteSegment}`;
+      return `${coordinates} | ${this.i18n.t('galactic.labels.tooltipVoid')}${noteSegment}`;
     }
     if (isCenter) {
-      return `${x},${y} | Galaxy Center${noteSegment}`;
+      return `${coordinates} | ${this.i18n.t('galactic.labels.tooltipGalaxyCenter')}${noteSegment}`;
     }
 
     const visiblePlanets = Math.max(0, planets);
-    const header = `${x},${y} | Planets: ${visiblePlanets}, Asteroids: ${asteroids}`;
+    const header =
+      `${coordinates} | ${this.i18n.t('galactic.labels.tooltipPlanets', { value: visiblePlanets })}, ` +
+      `${this.i18n.t('galactic.labels.tooltipAsteroids', { value: asteroids })}`;
     if (!ownership) {
-      return `${header} | No espionage data${noteSegment}`;
+      return `${header} | ${this.i18n.t('galactic.labels.tooltipNoEspionageData')}${noteSegment}`;
     }
 
     const [ownedByPlayer, neutralOwned, botOwned, humanOwned] = ownership;
-    return `${header} | You: ${ownedByPlayer}, Neutral: ${neutralOwned}, Bot: ${botOwned}, Human: ${humanOwned}${noteSegment}`;
+    return (
+      `${header} | ${this.i18n.t('galactic.labels.tooltipYou', { value: ownedByPlayer })}, ` +
+      `${this.i18n.t('galactic.labels.tooltipNeutral', { value: neutralOwned })}, ` +
+      `${this.i18n.t('galactic.labels.tooltipBot', { value: botOwned })}, ` +
+      `${this.i18n.t('galactic.labels.tooltipHuman', { value: humanOwned })}` +
+      noteSegment
+    );
   }
 
   private buildCoordinatesKey(x: number, y: number): string {
@@ -1522,10 +1533,17 @@ export class GalacticViewComponent implements OnInit {
 
   private formatAmountEntries(entries: Array<{ type: string; amount: number }>): string {
     if (entries.length <= 0) {
-      return 'none';
+      return this.i18n.t('galactic.labels.none');
     }
 
-    return entries.map((entry) => `${entry.type} x${this.formatInteger(entry.amount)}`).join(', ');
+    return entries
+      .map((entry) =>
+        this.i18n.t('galactic.labels.amountEntry', {
+          type: entry.type,
+          amount: this.formatInteger(entry.amount),
+        }),
+      )
+      .join(', ');
   }
 
   private formatDamagedShipEntries(
@@ -1537,13 +1555,17 @@ export class GalacticViewComponent implements OnInit {
     }>,
   ): string {
     if (entries.length <= 0) {
-      return 'none';
+      return this.i18n.t('galactic.labels.none');
     }
 
     return entries
-      .map(
-        (entry) =>
-          `${entry.type} x${this.formatInteger(entry.amount)} (${this.formatInteger(entry.averageDamagePercent)}% avg damage, missing hull ${this.formatInteger(entry.totalMissingHull)})`,
+      .map((entry) =>
+        this.i18n.t('galactic.labels.damagedAmountEntry', {
+          type: entry.type,
+          amount: this.formatInteger(entry.amount),
+          averageDamage: this.formatInteger(entry.averageDamagePercent),
+          missingHull: this.formatInteger(entry.totalMissingHull),
+        }),
       )
       .join(', ');
   }

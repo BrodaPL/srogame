@@ -7,7 +7,7 @@ import type {
   MissionLaunchContext,
   MissionResolutionContext,
   MissionSelection,
-  MissionSelectionContext
+  MissionSelectionContext,
 } from '../mission-context';
 import type { MissionResolutionResult } from '../mission-effect';
 
@@ -25,8 +25,8 @@ export class SpyFleetMission extends FleetMission {
       cargo: {
         metal: 0,
         crystal: 0,
-        deuterium: 0
-      }
+        deuterium: 0,
+      },
     };
   }
 
@@ -37,12 +37,23 @@ export class SpyFleetMission extends FleetMission {
   public override getPlannerChecks(context: MissionPlannerContext): MissionCheck[] {
     const checks = super.getPlannerChecks(context);
 
-    if (context.selectedTargetPlanet && context.selectedTargetPlanet.info.ownerId === context.selectedOriginPlanet?.info.ownerId) {
-      checks.push({ text: 'Target is your own planet.', severity: 'error' });
+    if (
+      context.selectedTargetPlanet &&
+      context.selectedTargetPlanet.info.ownerId === context.selectedOriginPlanet?.info.ownerId
+    ) {
+      checks.push({
+        text: 'Target is your own planet.',
+        textKey: 'missionPlanner.checks.spyOwnTarget',
+        severity: 'error',
+      });
     }
 
     if (context.selection.ships.every((entry) => entry.type !== ShipType.SPY_PROBE)) {
-      checks.push({ text: 'No espionage probes selected.', severity: 'error' });
+      checks.push({
+        text: 'No espionage probes selected.',
+        textKey: 'missionPlanner.checks.spyNoProbes',
+        severity: 'error',
+      });
     }
 
     return checks;
@@ -52,21 +63,31 @@ export class SpyFleetMission extends FleetMission {
     const checks = super.validateLaunch(context);
 
     if (context.targetPlanet.info.ownerId === context.playerId) {
-      checks.push({ text: 'Target is your own planet.', severity: 'error' });
+      checks.push({
+        text: 'Target is your own planet.',
+        textKey: 'missionPlanner.checks.spyOwnTarget',
+        severity: 'error',
+      });
     }
 
     if (context.selection.ships.every((entry) => entry.type !== ShipType.SPY_PROBE)) {
-      checks.push({ text: 'No espionage probes selected.', severity: 'error' });
+      checks.push({
+        text: 'No espionage probes selected.',
+        textKey: 'missionPlanner.checks.spyNoProbes',
+        severity: 'error',
+      });
     }
 
     return checks;
   }
 
-  public override resolveWithoutEncounter(_context: MissionResolutionContext): MissionResolutionResult {
+  public override resolveWithoutEncounter(
+    _context: MissionResolutionContext,
+  ): MissionResolutionResult {
     return {
       fleetOutcome: 'remove',
       effects: [{ type: 'generateEspionageReport' }],
-      reports: []
+      reports: [],
     };
   }
 }

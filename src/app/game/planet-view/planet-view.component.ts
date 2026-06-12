@@ -588,7 +588,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   protected buildingProductionLabel(building: Building): string {
-    return buildingProductionLabel(building.type);
+    return buildingProductionLabel(building.type, this.i18n.t.bind(this.i18n));
   }
 
   protected buildingCurrentPowerConsumption(building: Building): number {
@@ -2388,12 +2388,12 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   protected tradePortOfferGetLabel(offer: TradePortOfferDto): string {
     return this.i18n.t('planetView.trade.get', {
       amount: offer.getAmount,
-      resource: tradeResourceLabel(offer.getResourceType),
+      resource: tradeResourceLabel(offer.getResourceType, this.i18n.t.bind(this.i18n)),
     });
   }
 
   protected tradePortOfferCostLabel(offer: TradePortOfferDto): string {
-    return `${offer.totalCost} ${tradeResourceLabel(offer.costResourceType)}`;
+    return `${offer.totalCost} ${tradeResourceLabel(offer.costResourceType, this.i18n.t.bind(this.i18n))}`;
   }
 
   protected tradePortResourceIconPath(resourceType: TradeResourceType): string {
@@ -2410,7 +2410,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
   }
 
   protected tradePortResourceLabel(resourceType: TradeResourceType): string {
-    return tradeResourceLabel(resourceType);
+    return tradeResourceLabel(resourceType, this.i18n.t.bind(this.i18n));
   }
 
   protected tradePortOfferModifierLabel(offer: TradePortOfferDto): string {
@@ -2747,6 +2747,7 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
         label: contextualBuildingProductionLabel(
           building.type,
           currentLevel > 0 ? 'Current' : 'Level 1',
+          this.i18n.t.bind(this.i18n),
         ),
         value: String(
           currentLevel > 0
@@ -2800,7 +2801,11 @@ export class PlanetViewComponent implements OnInit, OnDestroy {
     } else {
       if (building.production1.length > 0) {
         stateRows.push({
-          label: contextualBuildingProductionLabel(building.type, 'Current'),
+          label: contextualBuildingProductionLabel(
+            building.type,
+            'Current',
+            this.i18n.t.bind(this.i18n),
+          ),
           value: String(this.buildingProductionAtCurrentLevel(building)),
         });
       }

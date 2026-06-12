@@ -3,7 +3,11 @@ import { DiplomaticStatus } from '../../diplomacy/diplomatic-status';
 import { FleetMission } from '../fleet-mission';
 import type { MissionCheck } from '../mission-check';
 import { resolveTargetDiplomaticStatus } from '../mission-context';
-import type { MissionPlannerContext, MissionLaunchContext, MissionResolutionContext } from '../mission-context';
+import type {
+  MissionPlannerContext,
+  MissionLaunchContext,
+  MissionResolutionContext,
+} from '../mission-context';
 import type { MissionResolutionResult } from '../mission-effect';
 import { FleetMissionType } from '../../enums/fleet-mission-type';
 
@@ -15,16 +19,20 @@ export class MoveFleetMission extends FleetMission {
     const targetStatus = resolveTargetDiplomaticStatus(
       playerOwnerId,
       targetOwnerId,
-      context.diplomacyResolver ?? null
+      context.diplomacyResolver ?? null,
     );
 
     if (
-      targetStatus !== null
-      && targetStatus !== DiplomaticStatus.SELF
-      && targetStatus !== DiplomaticStatus.ALLIED
-      && targetStatus !== DiplomaticStatus.PEACE
+      targetStatus !== null &&
+      targetStatus !== DiplomaticStatus.SELF &&
+      targetStatus !== DiplomaticStatus.ALLIED &&
+      targetStatus !== DiplomaticStatus.PEACE
     ) {
-      checks.push({ text: 'Move mission target must be your planet, a friendly orbit, or an unowned planet.', severity: 'error' });
+      checks.push({
+        text: 'Move mission target must be your planet, a friendly orbit, or an unowned planet.',
+        textKey: 'missionPlanner.checks.moveInvalidTarget',
+        severity: 'error',
+      });
     }
 
     return checks;
@@ -36,36 +44,41 @@ export class MoveFleetMission extends FleetMission {
     const targetStatus = resolveTargetDiplomaticStatus(
       context.playerId,
       targetOwnerId,
-      context.diplomacyResolver ?? null
+      context.diplomacyResolver ?? null,
     );
     if (
-      targetOwnerId !== null
-      && targetStatus !== DiplomaticStatus.SELF
-      && targetStatus !== DiplomaticStatus.ALLIED
-      && targetStatus !== DiplomaticStatus.PEACE
+      targetOwnerId !== null &&
+      targetStatus !== DiplomaticStatus.SELF &&
+      targetStatus !== DiplomaticStatus.ALLIED &&
+      targetStatus !== DiplomaticStatus.PEACE
     ) {
-      checks.push({ text: 'Move mission target must be your planet, a friendly orbit, or an unowned planet.', severity: 'error' });
+      checks.push({
+        text: 'Move mission target must be your planet, a friendly orbit, or an unowned planet.',
+        textKey: 'missionPlanner.checks.moveInvalidTarget',
+        severity: 'error',
+      });
     }
 
     return checks;
   }
 
-  public override resolveWithoutEncounter(context: MissionResolutionContext): MissionResolutionResult {
+  public override resolveWithoutEncounter(
+    context: MissionResolutionContext,
+  ): MissionResolutionResult {
     if (!context.targetPlanet) {
       return {
         fleetOutcome: 'keep',
         nextState: FleetState.MISSION_FAILURE_RETURNING,
         resetCreatedAtTurn: true,
         effects: [],
-        reports: []
+        reports: [],
       };
     }
-
 
     const targetStatus = resolveTargetDiplomaticStatus(
       context.fleet.ownerId,
       context.targetPlanet.info.ownerId,
-      context.diplomacyResolver ?? null
+      context.diplomacyResolver ?? null,
     );
 
     if (targetStatus === DiplomaticStatus.SELF) {
@@ -73,36 +86,43 @@ export class MoveFleetMission extends FleetMission {
         fleetOutcome: 'remove',
         effects: [
           { type: 'mergeFleetToPlanet', planetRef: 'target' },
-          { type: 'transferFleetCargoToPlanet', planetRef: 'target' }
+          { type: 'transferFleetCargoToPlanet', planetRef: 'target' },
         ],
-        reports: [{
-          kind: 'success',
-          body: `${context.fleet.missionType} mission completed successfully at ${context.targetPlanet.basicInfo.name}.`
-        }]
+        reports: [
+          {
+            kind: 'success',
+            body: `${context.fleet.missionType} mission completed successfully at ${context.targetPlanet.basicInfo.name}.`,
+          },
+        ],
       };
     }
 
     if (
-      context.targetPlanet.info.ownerId === null
-      || targetStatus === DiplomaticStatus.ALLIED
-      || targetStatus === DiplomaticStatus.PEACE
+      context.targetPlanet.info.ownerId === null ||
+      targetStatus === DiplomaticStatus.ALLIED ||
+      targetStatus === DiplomaticStatus.PEACE
     ) {
       return {
         fleetOutcome: 'keep',
         resetCreatedAtTurn: true,
-        effects: [{
-          type: 'setFleetOrbitState',
-          state: FleetState.ORBITING,
-          orbitActivity: FleetOrbitActivity.PASSIVE_HOLD,
-          missionType: FleetMissionType.HOLD,
-          suspendedMissionType: null
-        }],
-        reports: targetStatus === DiplomaticStatus.ALLIED || targetStatus === DiplomaticStatus.PEACE
-          ? [{
-            kind: 'success',
-            body: `Move mission entered friendly orbit over ${context.targetPlanet.basicInfo.name}.`
-          }]
-          : []
+        effects: [
+          {
+            type: 'setFleetOrbitState',
+            state: FleetState.ORBITING,
+            orbitActivity: FleetOrbitActivity.PASSIVE_HOLD,
+            missionType: FleetMissionType.HOLD,
+            suspendedMissionType: null,
+          },
+        ],
+        reports:
+          targetStatus === DiplomaticStatus.ALLIED || targetStatus === DiplomaticStatus.PEACE
+            ? [
+                {
+                  kind: 'success',
+                  body: `Move mission entered friendly orbit over ${context.targetPlanet.basicInfo.name}.`,
+                },
+              ]
+            : [],
       };
     }
 
@@ -111,10 +131,12 @@ export class MoveFleetMission extends FleetMission {
       nextState: FleetState.MISSION_FAILURE_RETURNING,
       resetCreatedAtTurn: true,
       effects: [],
-      reports: [{
-        kind: 'failure',
-        body: 'Move mission failed because the destination became owned by another player before arrival.'
-      }]
+      reports: [
+        {
+          kind: 'failure',
+          body: 'Move mission failed because the destination became owned by another player before arrival.',
+        },
+      ],
     };
   }
 
@@ -124,10 +146,12 @@ export class MoveFleetMission extends FleetMission {
       nextState: FleetState.MISSION_FAILURE_RETURNING,
       resetCreatedAtTurn: true,
       effects: [],
-      reports: [{
-        kind: 'failure',
-        body: 'Move mission encountered hostile ships and was forced to retreat after the battle.'
-      }]
+      reports: [
+        {
+          kind: 'failure',
+          body: 'Move mission encountered hostile ships and was forced to retreat after the battle.',
+        },
+      ],
     };
   }
 }

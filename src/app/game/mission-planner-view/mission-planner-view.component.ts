@@ -7,12 +7,12 @@ import { GameStateService } from '../../core/game-state.service';
 import { PlayerSessionService } from '../../core/player-session.service';
 import { resolveApiErrorMessage } from '../../i18n/api-message.utils';
 import { I18nPipe } from '../../i18n/i18n.pipe';
+import { resolveMissionCheckText } from '../../i18n/mission-check.utils';
 import { I18nService } from '../../i18n/i18n.service';
 import { BuildingBlueprintsFactory } from '../../factories/building-blueprints.factory';
 import { DefenceBlueprintsFactory } from '../../factories/defence-blueprints.factory';
 import { ShipBlueprintsFactory } from '../../factories/ship-blueprints.factory';
 import {
-  bombardmentPriorityLabel,
   BombardmentPriorities,
   BombardmentPrioritySelection,
   BombardmentPriorityTarget,
@@ -140,13 +140,7 @@ export class MissionPlannerViewComponent implements OnInit {
 
   protected readonly shipPurpose = ShipPurpose;
   protected readonly bombardmentPriorityTarget = BombardmentPriorityTarget;
-  protected readonly missionOptions: MissionOption[] = MISSION_REGISTRY.supportedMissions(
-    PHASE_ONE_MISSION_TYPES,
-  ).map((mission) => ({
-    type: mission.missionType,
-    label: mission.name,
-    description: mission.description,
-  }));
+  protected readonly missionOptions: MissionOption[];
 
   protected selectedMissionType = FleetMissionType.MOVE;
   protected isLoading = false;
@@ -217,6 +211,14 @@ export class MissionPlannerViewComponent implements OnInit {
     }
 
     const buildingBlueprints = BuildingBlueprintsFactory.fromDefaultJson();
+    this.missionOptions = MISSION_REGISTRY.supportedMissions(PHASE_ONE_MISSION_TYPES).map(
+      (mission) => ({
+        type: mission.missionType,
+        label: mission.name,
+        description: this.resolveMissionDescription(mission.description),
+      }),
+    );
+
     const resourceOptions: BombardmentPriorityOptionVm[] = [];
     const facilityOptions: BombardmentPriorityOptionVm[] = [];
     for (const [buildingType, building] of buildingBlueprints.buildingsMap.entries()) {
@@ -237,25 +239,23 @@ export class MissionPlannerViewComponent implements OnInit {
         options: [
           {
             value: BombardmentPriorityTarget.DEFENCES,
-            label: bombardmentPriorityLabel(BombardmentPriorityTarget.DEFENCES),
+            label: this.i18n.t('missionPlanner.bombardment.labels.defences'),
           },
           {
             value: BombardmentPriorityTarget.DEFENCES_CAN_SHOOT_TO_ORBIT,
-            label: bombardmentPriorityLabel(BombardmentPriorityTarget.DEFENCES_CAN_SHOOT_TO_ORBIT),
+            label: this.i18n.t('missionPlanner.bombardment.labels.defencesCanShootToOrbit'),
           },
           {
             value: BombardmentPriorityTarget.DEFENCES_CANNOT_SHOOT_TO_ORBIT,
-            label: bombardmentPriorityLabel(
-              BombardmentPriorityTarget.DEFENCES_CANNOT_SHOOT_TO_ORBIT,
-            ),
+            label: this.i18n.t('missionPlanner.bombardment.labels.defencesCannotShootToOrbit'),
           },
           {
             value: BombardmentPriorityTarget.RESOURCE_BUILDINGS,
-            label: bombardmentPriorityLabel(BombardmentPriorityTarget.RESOURCE_BUILDINGS),
+            label: this.i18n.t('missionPlanner.bombardment.labels.resourceBuildings'),
           },
           {
             value: BombardmentPriorityTarget.FACILITIES,
-            label: bombardmentPriorityLabel(BombardmentPriorityTarget.FACILITIES),
+            label: this.i18n.t('missionPlanner.bombardment.labels.facilities'),
           },
         ],
       },
@@ -276,7 +276,7 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected missionDescription(): string {
-    return this.currentMission().description;
+    return this.resolveMissionDescription(this.currentMission().description);
   }
 
   protected missionAllowsCargo(): boolean {
@@ -371,7 +371,12 @@ export class MissionPlannerViewComponent implements OnInit {
   }
 
   protected warningRows(): MissionWarningVm[] {
-    const warnings = this.currentMission().getPlannerChecks(this.buildPlannerContext());
+    const warnings = this.currentMission()
+      .getPlannerChecks(this.buildPlannerContext())
+      .map((warning) => ({
+        text: resolveMissionCheckText(this.i18n, warning),
+        severity: warning.severity,
+      }));
     if (this.useJumpGate) {
       warnings.push(...this.jumpGateWarningRows());
     }
@@ -418,6 +423,10 @@ export class MissionPlannerViewComponent implements OnInit {
     return this.selectedOriginPlanet
       ? `${this.selectedOriginPlanet.basicInfo.name} (${this.originCoordinatesInput})`
       : this.i18n.t('missionPlanner.jumpGate.hintSelectOrigin');
+  }
+
+  private resolveMissionDescription(value: string): string {
+    return value.startsWith('missionPlanner.') ? this.i18n.t(value) : value;
   }
 
   protected totalCargoCapacity(): number {

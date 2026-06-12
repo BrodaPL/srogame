@@ -1,0 +1,31 @@
+export const terminologyPl = {
+  buildingProduction: {
+    metalYield: 'Wydobycie metalu',
+    crystalYield: 'Wydobycie krysztalu',
+    deuteriumYield: 'Wydobycie deuteru',
+    energyOutput: 'Produkcja energii',
+    storageCapacity: 'Pojemnosc magazynu',
+    industryPower: 'Moc przemyslu',
+    shipyardPower: 'Moc stoczni',
+    industryShipyardMultiplier: 'Mnoznik przemyslu i stoczni',
+    researchPower: 'Moc badan',
+    orbitRepairCapacity: 'Zdolnosc naprawy na orbicie',
+    bombStorageCapacity: 'Pojemnosc magazynu bomb',
+    planetSizeBonus: 'Premia do rozmiaru planety',
+    fleetSlotCapacity: 'Pojemnosc slotow floty',
+    passiveScanRange: 'Zasieg skanu pasywnego',
+    jumpCapacity: 'Pojemnosc skoku',
+    tradeCapacity: 'Pojemnosc handlu',
+    plunderProtection: 'Ochrona przed grabieza',
+    output: 'Wynik',
+    context: {
+      current: 'Aktualne: {{label}}',
+      level1: 'Poziom 1: {{label}}',
+    },
+  },
+  resources: {
+    metal: 'Metal',
+    crystal: 'Krysztal',
+    deuterium: 'Deuter',
+  },
+} as const;

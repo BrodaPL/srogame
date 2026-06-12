@@ -4,12 +4,16 @@ import type { MissionCheck } from '../mission-check';
 import type {
   MissionLaunchContext,
   MissionPlannerContext,
-  MissionResolutionContext
+  MissionResolutionContext,
 } from '../mission-context';
 import type { MissionResolutionResult } from '../mission-effect';
 import { FleetMission } from '../fleet-mission';
 import { ShipType } from '../../enums/ship-type';
-import { calculateRecycleCapabilityForManyShips, calculateRecycleCapabilityFromEntries, hasRecycleEquipment } from '../../recycling/recycling-capability';
+import {
+  calculateRecycleCapabilityForManyShips,
+  calculateRecycleCapabilityFromEntries,
+  hasRecycleEquipment,
+} from '../../recycling/recycling-capability';
 
 export class RecycleFleetMission extends FleetMission {
   public override isShipRelevant(_shipType: ShipType, ship: Ship): boolean {
@@ -20,17 +24,24 @@ export class RecycleFleetMission extends FleetMission {
     const checks = super.getPlannerChecks(context);
     this.addRecycleChecks(
       checks,
-      context.selection.ships.map((entry) => [entry.type, entry.undamagedAmount + entry.damagedAmount] as [ShipType, number]),
-      context.totalCargoCapacity
+      context.selection.ships.map(
+        (entry) => [entry.type, entry.undamagedAmount + entry.damagedAmount] as [ShipType, number],
+      ),
+      context.totalCargoCapacity,
     );
 
     if (
-      context.selectedTargetPlanet
-      && (context.selectedTargetPlanet.objects.spaceDebris.metal
-        + context.selectedTargetPlanet.objects.spaceDebris.crystal
-        + context.selectedTargetPlanet.objects.spaceDebris.deuterium) <= 0
+      context.selectedTargetPlanet &&
+      context.selectedTargetPlanet.objects.spaceDebris.metal +
+        context.selectedTargetPlanet.objects.spaceDebris.crystal +
+        context.selectedTargetPlanet.objects.spaceDebris.deuterium <=
+        0
     ) {
-      checks.push({ text: 'No debris detected at target. The fleet will return immediately on arrival.', severity: 'note' });
+      checks.push({
+        text: 'No debris detected at target. The fleet will return immediately on arrival.',
+        textKey: 'missionPlanner.checks.recycleNoDebris',
+        severity: 'note',
+      });
     }
 
     return checks;
@@ -40,41 +51,58 @@ export class RecycleFleetMission extends FleetMission {
     const checks = super.validateLaunch(context);
     this.addRecycleChecks(
       checks,
-      context.selection.ships.map((entry) => [entry.type, entry.undamagedAmount + entry.damagedAmount] as [ShipType, number]),
-      context.totalCargoCapacity
+      context.selection.ships.map(
+        (entry) => [entry.type, entry.undamagedAmount + entry.damagedAmount] as [ShipType, number],
+      ),
+      context.totalCargoCapacity,
     );
     return checks;
   }
 
-  public override resolveWithoutEncounter(context: MissionResolutionContext): MissionResolutionResult {
+  public override resolveWithoutEncounter(
+    context: MissionResolutionContext,
+  ): MissionResolutionResult {
     return this.resolveArrival(context);
   }
 
-  public override resolveAfterEncounter(context: MissionResolutionContext): MissionResolutionResult {
+  public override resolveAfterEncounter(
+    context: MissionResolutionContext,
+  ): MissionResolutionResult {
     return this.resolveArrival(context);
   }
 
-  public override resolveIdleTurn(context: MissionResolutionContext): MissionResolutionResult | null {
+  public override resolveIdleTurn(
+    context: MissionResolutionContext,
+  ): MissionResolutionResult | null {
     if (!context.targetPlanet) {
-      return this.failedReturn('Recycle mission failed because the target was no longer available.');
+      return this.failedReturn(
+        'Recycle mission failed because the target was no longer available.',
+      );
     }
 
     const recycleStrength = calculateRecycleCapabilityForManyShips(context.fleet.ships);
     if (recycleStrength <= 0) {
-      return this.failedReturn('Recycle mission can no longer operate because no recycle equipment survived.');
+      return this.failedReturn(
+        'Recycle mission can no longer operate because no recycle equipment survived.',
+      );
     }
 
-    const availableCargoCapacity = Math.max(0, context.fleet.totalCargoCapacity - context.fleet.usedCargoCapacity);
+    const availableCargoCapacity = Math.max(
+      0,
+      context.fleet.totalCargoCapacity - context.fleet.usedCargoCapacity,
+    );
     if (availableCargoCapacity <= 0) {
       return {
         fleetOutcome: 'keep',
         nextState: FleetState.RETURNING,
         resetCreatedAtTurn: true,
         effects: [],
-        reports: [{
-          kind: 'success',
-          body: `Recycle mission filled its cargo holds over ${context.targetPlanet.basicInfo.name} and started the return flight.`
-        }]
+        reports: [
+          {
+            kind: 'success',
+            body: `Recycle mission filled its cargo holds over ${context.targetPlanet.basicInfo.name} and started the return flight.`,
+          },
+        ],
       };
     }
 
@@ -86,10 +114,12 @@ export class RecycleFleetMission extends FleetMission {
         nextState: FleetState.RETURNING,
         resetCreatedAtTurn: true,
         effects: [],
-        reports: [{
-          kind: 'success',
-          body: `Recycle mission cleared the debris field over ${context.targetPlanet.basicInfo.name} and started the return flight.`
-        }]
+        reports: [
+          {
+            kind: 'success',
+            body: `Recycle mission cleared the debris field over ${context.targetPlanet.basicInfo.name} and started the return flight.`,
+          },
+        ],
       };
     }
 
@@ -97,9 +127,10 @@ export class RecycleFleetMission extends FleetMission {
       debris.metal,
       debris.crystal,
       debris.deuterium,
-      Math.min(recycleStrength, availableCargoCapacity, debrisAmount)
+      Math.min(recycleStrength, availableCargoCapacity, debrisAmount),
     );
-    const collectedAmount = collectedResources.metal + collectedResources.crystal + collectedResources.deuterium;
+    const collectedAmount =
+      collectedResources.metal + collectedResources.crystal + collectedResources.deuterium;
     if (collectedAmount <= 0) {
       return null;
     }
@@ -112,32 +143,43 @@ export class RecycleFleetMission extends FleetMission {
       fleetOutcome: 'keep',
       nextState: missionFinished ? FleetState.RETURNING : FleetState.ORBITING,
       resetCreatedAtTurn: missionFinished,
-      effects: [{
-        type: 'collectPlanetDebrisToFleetCargo',
-        resources: collectedResources
-      }],
+      effects: [
+        {
+          type: 'collectPlanetDebrisToFleetCargo',
+          resources: collectedResources,
+        },
+      ],
       reports: missionFinished
-        ? [{
-          kind: 'success',
-          body: remainingDebris <= 0
-            ? `Recycle mission exhausted the debris field over ${context.targetPlanet.basicInfo.name} and started the return flight.`
-            : `Recycle mission filled its cargo holds over ${context.targetPlanet.basicInfo.name} and started the return flight.`
-        }]
-        : []
+        ? [
+            {
+              kind: 'success',
+              body:
+                remainingDebris <= 0
+                  ? `Recycle mission exhausted the debris field over ${context.targetPlanet.basicInfo.name} and started the return flight.`
+                  : `Recycle mission filled its cargo holds over ${context.targetPlanet.basicInfo.name} and started the return flight.`,
+            },
+          ]
+        : [],
     };
   }
 
   public override onBattleRetreat(_context: MissionResolutionContext): MissionResolutionResult {
-    return this.failedReturn('Recycle mission encountered hostile resistance and was forced to retreat.');
+    return this.failedReturn(
+      'Recycle mission encountered hostile resistance and was forced to retreat.',
+    );
   }
 
   private resolveArrival(context: MissionResolutionContext): MissionResolutionResult {
     if (!context.targetPlanet) {
-      return this.failedReturn('Recycle mission failed because the target was no longer available on arrival.');
+      return this.failedReturn(
+        'Recycle mission failed because the target was no longer available on arrival.',
+      );
     }
 
     if (calculateRecycleCapabilityForManyShips(context.fleet.ships) <= 0) {
-      return this.failedReturn('Recycle mission failed because no recycle equipment survived the approach.');
+      return this.failedReturn(
+        'Recycle mission failed because no recycle equipment survived the approach.',
+      );
     }
 
     if (context.targetPlanet.rBDSFTQ.spaceDebris.getTotalResourceAmount() <= 0) {
@@ -146,40 +188,54 @@ export class RecycleFleetMission extends FleetMission {
         nextState: FleetState.RETURNING,
         resetCreatedAtTurn: true,
         effects: [],
-        reports: [{
-          kind: 'success',
-          body: `Recycle mission found no debris over ${context.targetPlanet.basicInfo.name} and started the return flight.`
-        }]
+        reports: [
+          {
+            kind: 'success',
+            body: `Recycle mission found no debris over ${context.targetPlanet.basicInfo.name} and started the return flight.`,
+          },
+        ],
       };
     }
 
     return {
       fleetOutcome: 'keep',
       resetCreatedAtTurn: true,
-      effects: [{
-        type: 'setFleetOrbitState',
-        state: FleetState.ORBITING,
-        orbitActivity: FleetOrbitActivity.MISSION_IN_PROGRESS
-      }],
-      reports: [{
-        kind: 'success',
-        body: `Recycle mission established salvage orbit over ${context.targetPlanet.basicInfo.name}.`
-      }]
+      effects: [
+        {
+          type: 'setFleetOrbitState',
+          state: FleetState.ORBITING,
+          orbitActivity: FleetOrbitActivity.MISSION_IN_PROGRESS,
+        },
+      ],
+      reports: [
+        {
+          kind: 'success',
+          body: `Recycle mission established salvage orbit over ${context.targetPlanet.basicInfo.name}.`,
+        },
+      ],
     };
   }
 
   private addRecycleChecks(
     checks: MissionCheck[],
     shipCounts: Array<[ShipType, number]>,
-    totalCargoCapacity: number
+    totalCargoCapacity: number,
   ): void {
     const recycleStrength = calculateRecycleCapabilityFromEntries(shipCounts);
     if (recycleStrength <= 0) {
-      checks.push({ text: 'Select at least one ship with Recycle equipment.', severity: 'error' });
+      checks.push({
+        text: 'Select at least one ship with Recycle equipment.',
+        textKey: 'missionPlanner.checks.recycleRequiresEquipment',
+        severity: 'error',
+      });
     }
 
     if (Math.max(0, totalCargoCapacity) <= 0) {
-      checks.push({ text: 'Recycle mission requires cargo space to store recovered debris.', severity: 'error' });
+      checks.push({
+        text: 'Recycle mission requires cargo space to store recovered debris.',
+        textKey: 'missionPlanner.checks.recycleRequiresCargo',
+        severity: 'error',
+      });
     }
   }
 
@@ -187,12 +243,12 @@ export class RecycleFleetMission extends FleetMission {
     metal: number,
     crystal: number,
     deuterium: number,
-    requestedAmount: number
+    requestedAmount: number,
   ): { metal: number; crystal: number; deuterium: number } {
     const pools = [
       { key: 'metal' as const, amount: Math.max(0, Math.floor(metal)) },
       { key: 'crystal' as const, amount: Math.max(0, Math.floor(crystal)) },
-      { key: 'deuterium' as const, amount: Math.max(0, Math.floor(deuterium)) }
+      { key: 'deuterium' as const, amount: Math.max(0, Math.floor(deuterium)) },
     ];
     const totalAmount = pools.reduce((total, entry) => total + entry.amount, 0);
     const normalizedRequest = Math.max(0, Math.floor(requestedAmount));
@@ -212,15 +268,14 @@ export class RecycleFleetMission extends FleetMission {
         index,
         amount: entry.amount,
         allocated: baseAmount,
-        remainder: exactShare - baseAmount
+        remainder: exactShare - baseAmount,
       };
     });
 
     let allocatedAmount = allocations.reduce((total, entry) => total + entry.allocated, 0);
-    const remainderCandidates = [...allocations].sort((left, right) =>
-      right.remainder - left.remainder
-      || right.amount - left.amount
-      || left.index - right.index
+    const remainderCandidates = [...allocations].sort(
+      (left, right) =>
+        right.remainder - left.remainder || right.amount - left.amount || left.index - right.index,
     );
 
     while (allocatedAmount < normalizedRequest) {
@@ -247,7 +302,7 @@ export class RecycleFleetMission extends FleetMission {
     return {
       metal: allocations.find((entry) => entry.key === 'metal')?.allocated ?? 0,
       crystal: allocations.find((entry) => entry.key === 'crystal')?.allocated ?? 0,
-      deuterium: allocations.find((entry) => entry.key === 'deuterium')?.allocated ?? 0
+      deuterium: allocations.find((entry) => entry.key === 'deuterium')?.allocated ?? 0,
     };
   }
 
@@ -257,7 +312,7 @@ export class RecycleFleetMission extends FleetMission {
       nextState: FleetState.MISSION_FAILURE_RETURNING,
       resetCreatedAtTurn: true,
       effects: [],
-      reports: [{ kind: 'failure', body }]
+      reports: [{ kind: 'failure', body }],
     };
   }
 }

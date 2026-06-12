@@ -70,6 +70,13 @@ export const missionPlannerPl = {
     secondary: 'Drugorzedny',
     tertiary: 'Trzeciorzedny',
     random: 'Losowy',
+    labels: {
+      defences: 'Obrony',
+      defencesCanShootToOrbit: 'Obrony canShootToOrbit=true',
+      defencesCannotShootToOrbit: 'Obrony canShootToOrbit=false',
+      resourceBuildings: 'Budynki surowcowe',
+      facilities: 'Infrastruktura',
+    },
     groups: {
       categories: 'Kategorie',
       resourceBuildings: 'Budynki surowcowe',
@@ -143,6 +150,79 @@ export const missionPlannerPl = {
     fleetSummary: 'Flota #{{fleetId}} na orbicie {{targetPlanet}}',
     fleetStats: 'Statki: {{ships}} | Paliwo w ladunku: {{fuel}}',
     noneAvailable: 'Nie ma jeszcze flot na orbicie dostepnych jako zdalne pochodzenie.',
+  },
+  missions: {
+    descriptions: {
+      ATTACK:
+        'Atakuj wrogie albo pasywne planety, po zwyciestwie zrabuj surowce i automatycznie wroc.',
+      MOVE: 'Przemiesc statki na wlasne planety, przyjazna orbite albo nieposiadana planete. Ladunek jest dozwolony.',
+      DEFEND:
+        'Wyslij flote wojskowa na niewroga orbite. Zostanie tam i dolaczy do lokalnej obrony, gdy ta orbita zostanie zaatakowana.',
+      TRANSPORT:
+        'Wyslij surowce i statki na wlasne albo przyjazne planety, a potem automatycznie wroc.',
+      ARMAMENT_DELIVERY:
+        'Dostarcz surowce, jednostki PLANETARY_BOMB i przenoszone male statki na wlasne albo sojusznicze planety, a potem automatycznie wroc.',
+      SPY: 'Wyslij tylko Spy Probes. Ladunek jest wylaczony dla tej misji.',
+      BOMBARD:
+        'Przebij sie przez wroga orbite, raz uderz budynki bronia bombardujaca i automatycznie wroc.',
+      SIEGE:
+        'Przebij sie przez wroga orbite, zostan nad celem i kontynuuj bombardowanie co ture, dopoki flota nie opusczy orbity.',
+      REPAIR:
+        'Przemiesc sie na niewroga planete albo orbite i zostan tam, az wszystkie przyjazne uszkodzenia zostana naprawione, a potem automatycznie wroc.',
+      RECYCLE:
+        'Przemiesc sie na orbite, zbieraj szczatki sprzetem recyklingowym co ture i wroc, gdy flota bedzie pelna albo pole szczatkow sie skonczy.',
+      COLONIZE: 'Wyslij Colonizer na nieposiadana planete.',
+      HOLD: 'Utrzymuj flote zaparkowana na orbicie bez logiki misji, dopoki nie dostanie nowego rozkazu.',
+    },
+  },
+  checks: {
+    selectOrigin: 'Wybierz planete pochodzenia.',
+    selectTarget: 'Wybierz albo rozpoznaj planete celu.',
+    selectShip: 'Wybierz co najmniej jeden statek.',
+    insufficientCargo: 'Za malo miejsca na ladunek.',
+    insufficientHangar: 'Za malo miejsca w hangarze.',
+    activeFleetLimit:
+      'Osiagnieto limit aktywnych flot ({{active}}/{{max}}). Ulepsz COMPUTER_TECHNOLOGY, aby kontrolowac wiecej flot.',
+    missionCannotCarryCargo: 'Misja {{mission}} nie moze przewozic ladunku.',
+    missionRequiresCargo: 'Misja {{mission}} wymaga ladunku.',
+    missionTargetCannotBeUnowned: 'Cel misji {{mission}} nie moze byc nieposiadany.',
+    missionTargetOwnershipInvalid: 'Wlasnosc celu dla misji {{mission}} jest nieprawidlowa.',
+    missionRequiredShipType: '{{shipType}} jest wymagany dla misji {{mission}}.',
+    missionExclusiveShipTypes: 'Misja {{mission}} przyjmuje tylko {{shipTypes}}.',
+    noMilitaryShipAssigned: 'Nie przydzielono zadnego statku wojskowego!',
+    hangarCapacityRemaining: 'Pozostale miejsce w hangarze: {{remaining}}.',
+    insufficientDeuterium: 'Za malo deuteru na ladunek i paliwo.',
+    attackInvalidTarget:
+      'Cel misji Attack musi byc posiadana planeta o statusie WAR, NEUTRAL albo PASSIVE.',
+    bombardInvalidTarget: 'Cel misji Bombard musi byc wroga posiadana planeta.',
+    bombardRequiresBomber: 'BOMBARD wymaga co najmniej jednego Bombers.',
+    colonizeInvalidTarget:
+      'Misja Colonize moze celowac tylko w nieposiadane planety albo pasywne neutralne planety.',
+    ownedPlanetLimit:
+      'Osiagnieto limit posiadanych planet ({{owned}}/{{max}}). Ulepsz ADAPTIVE_TECHNOLOGY, aby kolonizowac wiecej planet.',
+    defendInvalidTarget:
+      'Cel misji Guard musi byc twoja planeta, niewroga orbita albo nieposiadana planeta.',
+    defendRequiresMilitaryShip: 'Guard wymaga co najmniej jednego statku wojskowego.',
+    moveInvalidTarget:
+      'Cel misji Move musi byc twoja planeta, przyjazna orbita albo nieposiadana planeta.',
+    repairInvalidTarget: 'Cel misji Repair nie moze byc wrogi.',
+    repairRequiresDrone: 'Wybierz co najmniej jednego Repair Drone.',
+    recycleNoDebris: 'Na celu nie wykryto szczatkow. Flota natychmiast zawroci po przylocie.',
+    recycleRequiresEquipment: 'Wybierz co najmniej jeden statek wyposazony w sprzet recyklingowy.',
+    recycleRequiresCargo: 'Misja Recycle wymaga ladownosci do przechowania odzyskanych szczatkow.',
+    siegeInvalidTarget: 'Cel misji Siege musi byc wroga posiadana planeta.',
+    siegeRequiresBomber: 'SIEGE wymaga co najmniej jednego Bombers.',
+    spyOwnTarget: 'Cel jest twoja wlasna planeta.',
+    spyNoProbes: 'Nie wybrano zadnych sond szpiegowskich.',
+    transportInvalidTarget:
+      'Cel misji Transport musi byc jedna z twoich planet albo przyjazna planeta.',
+    armamentDeliveryInvalidTarget:
+      'Cel misji Armament Delivery musi byc jedna z twoich planet albo planeta sojusznicza.',
+    armamentDeliveryRequiresPayload:
+      'Misja Armament Delivery wymaga co najmniej jednej jednostki PLANETARY_BOMB albo jednego dostarczalnego malego statku.',
+    armamentDeliveryRequiresCarrier:
+      'Misja Armament Delivery wymaga co najmniej jednego nosiciela z pojemnoscia hangaru.',
+    armamentDeliveryExceedsHangar: 'Wybrany ladunek uzbrojenia przekracza pojemnosc hangaru floty.',
   },
   errors: {
     noSession: 'Nie znaleziono sesji gracza.',

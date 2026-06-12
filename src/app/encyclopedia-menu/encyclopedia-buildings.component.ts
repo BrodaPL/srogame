@@ -38,7 +38,7 @@ export class EncyclopediaBuildingsComponent {
   }
 
   protected buildingProductionLabel(building: Building): string {
-    return buildingProductionLabel(building.type);
+    return buildingProductionLabel(building.type, this.i18n.t.bind(this.i18n));
   }
 
   protected buildingDescription(building: Building): string {

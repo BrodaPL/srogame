@@ -19,6 +19,7 @@ import { productionEn } from './production.en';
 import { researchesEn } from './researches.en';
 import { settingsEn } from './settings.en';
 import { setupEn } from './setup.en';
+import { terminologyEn } from './terminology.en';
 import { topMenuEn } from './top-menu.en';
 
 export const enTranslations = {
@@ -43,5 +44,6 @@ export const enTranslations = {
   researches: researchesEn,
   settings: settingsEn,
   setup: setupEn,
+  terminology: terminologyEn,
   topMenu: topMenuEn,
 } as const;

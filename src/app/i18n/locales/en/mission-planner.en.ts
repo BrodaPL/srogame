@@ -69,6 +69,13 @@ export const missionPlannerEn = {
     secondary: 'Secondary',
     tertiary: 'Tertiary',
     random: 'Random',
+    labels: {
+      defences: 'Defences',
+      defencesCanShootToOrbit: 'Defences canShootToOrbit=true',
+      defencesCannotShootToOrbit: 'Defences canShootToOrbit=false',
+      resourceBuildings: 'Resource buildings',
+      facilities: 'Facilities',
+    },
     groups: {
       categories: 'Categories',
       resourceBuildings: 'Resource buildings',
@@ -141,6 +148,78 @@ export const missionPlannerEn = {
     fleetSummary: 'Fleet #{{fleetId}} orbiting {{targetPlanet}}',
     fleetStats: 'Ships: {{ships}} | Cargo fuel: {{fuel}}',
     noneAvailable: 'No orbiting fleets are available as remote origins yet.',
+  },
+  missions: {
+    descriptions: {
+      ATTACK:
+        'Attack hostile or passive planets, steal resources after victory, then return automatically.',
+      MOVE: 'Relocate ships to your own planets, friendly orbit, or an unowned planet. Cargo is allowed.',
+      DEFEND:
+        'Send a military fleet to non-hostile orbit. It stays there and joins the local defense when that orbit is attacked.',
+      TRANSPORT:
+        'Send resources and ships to your own or friendly planets, then return automatically.',
+      ARMAMENT_DELIVERY:
+        'Deliver resources, PLANETARY_BOMB units, and carried small ships to your own or allied planets, then return automatically.',
+      SPY: 'Send only Spy Probes. Cargo is disabled for this mission.',
+      BOMBARD:
+        'Fight through hostile orbit, strike buildings once with bombardment weapons, then return automatically.',
+      SIEGE:
+        'Fight through hostile orbit, stay over the target, and continue bombardment every turn until the fleet leaves orbit.',
+      REPAIR:
+        'Move to a non-hostile planet or orbit and stay there until all friendly damage is repaired, then return automatically.',
+      RECYCLE:
+        'Move to orbit, gather debris with recycle equipment each turn, and return once the fleet is full or the debris field is empty.',
+      COLONIZE: 'Send a Colonizer to an unowned planet.',
+      HOLD: 'Keep a fleet parked in orbit without running mission logic until a new order is issued.',
+    },
+  },
+  checks: {
+    selectOrigin: 'Select origin planet.',
+    selectTarget: 'Select or resolve target planet.',
+    selectShip: 'Select at least one ship.',
+    insufficientCargo: 'Insufficient cargo space.',
+    insufficientHangar: 'Insufficient hangar space.',
+    activeFleetLimit:
+      'Active fleet limit reached ({{active}}/{{max}}). Upgrade COMPUTER_TECHNOLOGY to control more fleets.',
+    missionCannotCarryCargo: '{{mission}} mission cannot carry cargo.',
+    missionRequiresCargo: '{{mission}} mission requires cargo.',
+    missionTargetCannotBeUnowned: '{{mission}} mission target cannot be unowned.',
+    missionTargetOwnershipInvalid: '{{mission}} mission target ownership is not valid.',
+    missionRequiredShipType: '{{shipType}} is required for {{mission}} mission.',
+    missionExclusiveShipTypes: '{{mission}} mission accepts only {{shipTypes}}.',
+    noMilitaryShipAssigned: 'No military ship has been assigned!',
+    hangarCapacityRemaining: 'Hangar capacity remaining: {{remaining}}.',
+    insufficientDeuterium: 'Insufficient deuterium for cargo and fuel.',
+    attackInvalidTarget: 'Attack mission target must be a WAR, NEUTRAL, or PASSIVE owned planet.',
+    bombardInvalidTarget: 'Bombard mission target must be a hostile owned planet.',
+    bombardRequiresBomber: 'BOMBARD requires at least one Bomber ship.',
+    colonizeInvalidTarget:
+      'Colonize mission can target only unowned planets or passive neutral planets.',
+    ownedPlanetLimit:
+      'Owned planet limit reached ({{owned}}/{{max}}). Upgrade ADAPTIVE_TECHNOLOGY to colonize more planets.',
+    defendInvalidTarget:
+      'Guard mission target must be your planet, a non-hostile orbit, or an unowned planet.',
+    defendRequiresMilitaryShip: 'Guard requires at least one military ship.',
+    moveInvalidTarget:
+      'Move mission target must be your planet, a friendly orbit, or an unowned planet.',
+    repairInvalidTarget: 'Repair mission target cannot be hostile.',
+    repairRequiresDrone: 'Select at least one Repair Drone.',
+    recycleNoDebris: 'No debris detected at target. The fleet will return immediately on arrival.',
+    recycleRequiresEquipment: 'Select at least one ship with Recycle equipment.',
+    recycleRequiresCargo: 'Recycle mission requires cargo space to store recovered debris.',
+    siegeInvalidTarget: 'Siege mission target must be a hostile owned planet.',
+    siegeRequiresBomber: 'SIEGE requires at least one Bomber ship.',
+    spyOwnTarget: 'Target is your own planet.',
+    spyNoProbes: 'No espionage probes selected.',
+    transportInvalidTarget:
+      'Transport mission target must be one of your planets or a friendly planet.',
+    armamentDeliveryInvalidTarget:
+      'Armament Delivery mission target must be one of your planets or an allied planet.',
+    armamentDeliveryRequiresPayload:
+      'Armament Delivery mission requires at least one PLANETARY_BOMB or one deliverable small ship.',
+    armamentDeliveryRequiresCarrier:
+      'Armament Delivery mission requires at least one carrier ship with hangar capacity.',
+    armamentDeliveryExceedsHangar: 'Selected armament payload exceeds the fleet hangar capacity.',
   },
   errors: {
     noSession: 'No player session found.',

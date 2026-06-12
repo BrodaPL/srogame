@@ -13,7 +13,7 @@ import type {
   MissionSelection,
   MissionSelectionContext,
   MissionResolutionContext,
-  MissionReportContext
+  MissionReportContext,
 } from './mission-context';
 import { cargoAmount, resolveTargetDiplomaticStatus } from './mission-context';
 import type { EncounterLocation } from './encounters/encounter-location';
@@ -36,7 +36,9 @@ type CommonChecksContext = {
   targetSelected: boolean;
   originSelected: boolean;
   selection: MissionSelection;
-  diplomacyResolver?: MissionPlannerContext['diplomacyResolver'] | MissionLaunchContext['diplomacyResolver'];
+  diplomacyResolver?:
+    | MissionPlannerContext['diplomacyResolver']
+    | MissionLaunchContext['diplomacyResolver'];
 };
 
 export class FleetMission {
@@ -68,7 +70,7 @@ export class FleetMission {
       carriedBombs: context.selection.carriedBombs.map((entry) => ({ ...entry })),
       cargo: this.blueprint.shipRules.allowCargo
         ? { ...context.selection.cargo }
-        : { metal: 0, crystal: 0, deuterium: 0 }
+        : { metal: 0, crystal: 0, deuterium: 0 },
     };
   }
 
@@ -89,13 +91,16 @@ export class FleetMission {
       targetSelected: context.selectedTargetPlanet !== null,
       originSelected: context.selectedOriginPlanet !== null,
       selection: context.selection,
-      diplomacyResolver: context.diplomacyResolver ?? null
+      diplomacyResolver: context.diplomacyResolver ?? null,
     });
   }
 
   public validateLaunch(context: MissionLaunchContext): MissionCheck[] {
     return this.getCommonChecks({
-      totalSelectedShips: context.selection.ships.reduce((total, entry) => total + entry.undamagedAmount + entry.damagedAmount, 0),
+      totalSelectedShips: context.selection.ships.reduce(
+        (total, entry) => total + entry.undamagedAmount + entry.damagedAmount,
+        0,
+      ),
       totalCargoCapacity: context.totalCargoCapacity,
       usedCargoCapacity: context.usedCargoCapacity,
       totalHangarCapacity: context.totalHangarCapacity,
@@ -103,14 +108,15 @@ export class FleetMission {
       hasMilitaryShips: context.hasMilitaryShips,
       activeFleetCount: context.activeFleetCount,
       maxActiveFleetCount: context.maxActiveFleetCount,
-      availableDeuterium: context.availableDeuterium ?? context.originPlanet.rBDSFTQ.resources.deuterium,
+      availableDeuterium:
+        context.availableDeuterium ?? context.originPlanet.rBDSFTQ.resources.deuterium,
       fuelCost: context.fuelCost,
       targetOwnerId: context.targetPlanet.info.ownerId,
       playerOwnerId: context.playerId,
       targetSelected: true,
       originSelected: true,
       selection: context.selection,
-      diplomacyResolver: context.diplomacyResolver ?? null
+      diplomacyResolver: context.diplomacyResolver ?? null,
     }).filter((check) => check.severity === 'error');
   }
 
@@ -126,14 +132,14 @@ export class FleetMission {
         kind: 'planetOrbit',
         x: coordinates.x,
         y: coordinates.y,
-        z: Math.max(0, context.targetPlanet.basicInfo.order - 1)
+        z: Math.max(0, context.targetPlanet.basicInfo.order - 1),
       };
     }
 
     return {
       kind: 'starSystem',
       x: context.targetPlanet.basicInfo.solarSystem.coordinates.x,
-      y: context.targetPlanet.basicInfo.solarSystem.coordinates.y
+      y: context.targetPlanet.basicInfo.solarSystem.coordinates.y,
     };
   }
 
@@ -148,14 +154,14 @@ export class FleetMission {
         kind: 'planetOrbit',
         x: fleet.target.x,
         y: fleet.target.y,
-        z: fleet.target.z
+        z: fleet.target.z,
       };
     }
 
     return {
       kind: 'starSystem',
       x: fleet.target.x,
-      y: fleet.target.y
+      y: fleet.target.y,
     };
   }
 
@@ -175,13 +181,13 @@ export class FleetMission {
     return {
       fleetOutcome: 'keep',
       effects: [],
-      reports: []
+      reports: [],
     };
   }
 
   public resolveAfterEncounter(
     context: MissionResolutionContext,
-    _outcome: FleetEncounterOutcome
+    _outcome: FleetEncounterOutcome,
   ): MissionResolutionResult {
     return this.resolveWithoutEncounter(context);
   }
@@ -196,7 +202,7 @@ export class FleetMission {
       nextState: FleetState.MISSION_FAILURE_RETURNING,
       resetCreatedAtTurn: true,
       effects: [],
-      reports: []
+      reports: [],
     };
   }
 
@@ -210,9 +216,9 @@ export class FleetMission {
         sourcePlanetName: context.fleet.targetPlanetName,
         originCoordinates: { ...context.fleet.origin },
         originPlanetName: context.fleet.originPlanetName,
-        senderPlayerName: context.player.playerName
+        senderPlayerName: context.player.playerName,
       },
-      appendFleetReportManifest(body, context.fleet.ships, context.fleet.cargo)
+      appendFleetReportManifest(body, context.fleet.ships, context.fleet.cargo),
     );
   }
 
@@ -226,9 +232,9 @@ export class FleetMission {
         sourcePlanetName: context.fleet.targetPlanetName,
         originCoordinates: { ...context.fleet.origin },
         originPlanetName: context.fleet.originPlanetName,
-        senderPlayerName: context.player.playerName
+        senderPlayerName: context.player.playerName,
       },
-      body
+      body,
     );
   }
 
@@ -242,9 +248,9 @@ export class FleetMission {
         sourcePlanetName: context.fleet.targetPlanetName,
         originCoordinates: { ...context.fleet.origin },
         originPlanetName: context.fleet.originPlanetName,
-        senderPlayerName: context.player.playerName
+        senderPlayerName: context.player.playerName,
       },
-      body
+      body,
     );
   }
 
@@ -252,56 +258,105 @@ export class FleetMission {
     const checks: MissionCheck[] = [];
 
     if (!context.originSelected) {
-      checks.push({ text: 'Select origin planet.', severity: 'error' });
+      checks.push({
+        text: 'Select origin planet.',
+        textKey: 'missionPlanner.checks.selectOrigin',
+        severity: 'error',
+      });
     }
 
     if (!context.targetSelected) {
-      checks.push({ text: 'Select or resolve target planet.', severity: 'error' });
+      checks.push({
+        text: 'Select or resolve target planet.',
+        textKey: 'missionPlanner.checks.selectTarget',
+        severity: 'error',
+      });
     }
 
     if (context.totalSelectedShips <= 0) {
-      checks.push({ text: 'Select at least one ship.', severity: 'error' });
+      checks.push({
+        text: 'Select at least one ship.',
+        textKey: 'missionPlanner.checks.selectShip',
+        severity: 'error',
+      });
     }
 
     if (context.usedCargoCapacity > context.totalCargoCapacity) {
-      checks.push({ text: 'Insufficient cargo space.', severity: 'error' });
+      checks.push({
+        text: 'Insufficient cargo space.',
+        textKey: 'missionPlanner.checks.insufficientCargo',
+        severity: 'error',
+      });
     }
 
     if (context.usedHangarCapacity > context.totalHangarCapacity) {
-      checks.push({ text: 'Insufficient hangar space.', severity: 'error' });
+      checks.push({
+        text: 'Insufficient hangar space.',
+        textKey: 'missionPlanner.checks.insufficientHangar',
+        severity: 'error',
+      });
     }
 
     if (context.activeFleetCount >= context.maxActiveFleetCount) {
       checks.push({
         text: `Active fleet limit reached (${context.activeFleetCount}/${context.maxActiveFleetCount}). Upgrade COMPUTER_TECHNOLOGY to control more fleets.`,
-        severity: 'error'
+        textKey: 'missionPlanner.checks.activeFleetLimit',
+        textParams: {
+          active: context.activeFleetCount,
+          max: context.maxActiveFleetCount,
+        },
+        severity: 'error',
       });
     }
 
     const selectedCargoAmount = cargoAmount(context.selection.cargo);
     if (!this.blueprint.shipRules.allowCargo && selectedCargoAmount > 0) {
-      checks.push({ text: `${this.name} mission cannot carry cargo.`, severity: 'error' });
+      checks.push({
+        text: `${this.name} mission cannot carry cargo.`,
+        textKey: 'missionPlanner.checks.missionCannotCarryCargo',
+        textParams: { mission: this.name },
+        severity: 'error',
+      });
     }
 
     if (this.blueprint.shipRules.requiresCargo && selectedCargoAmount <= 0) {
-      checks.push({ text: `${this.name} mission requires cargo.`, severity: 'error' });
+      checks.push({
+        text: `${this.name} mission requires cargo.`,
+        textKey: 'missionPlanner.checks.missionRequiresCargo',
+        textParams: { mission: this.name },
+        severity: 'error',
+      });
     }
 
     const targetStatus = resolveTargetDiplomaticStatus(
       context.playerOwnerId,
       context.targetOwnerId,
-      context.diplomacyResolver ?? null
+      context.diplomacyResolver ?? null,
     );
-    if (context.targetSelected && context.targetOwnerId === null && !this.blueprint.targetRules.allowUnowned) {
-      checks.push({ text: `${this.name} mission target cannot be unowned.`, severity: 'error' });
+    if (
+      context.targetSelected &&
+      context.targetOwnerId === null &&
+      !this.blueprint.targetRules.allowUnowned
+    ) {
+      checks.push({
+        text: `${this.name} mission target cannot be unowned.`,
+        textKey: 'missionPlanner.checks.missionTargetCannotBeUnowned',
+        textParams: { mission: this.name },
+        severity: 'error',
+      });
     }
 
     if (
-      context.targetSelected
-      && targetStatus !== null
-      && !this.blueprint.targetRules.allowedDiplomaticStatuses.includes(targetStatus)
+      context.targetSelected &&
+      targetStatus !== null &&
+      !this.blueprint.targetRules.allowedDiplomaticStatuses.includes(targetStatus)
     ) {
-      checks.push({ text: `${this.name} mission target ownership is not valid.`, severity: 'error' });
+      checks.push({
+        text: `${this.name} mission target ownership is not valid.`,
+        textKey: 'missionPlanner.checks.missionTargetOwnershipInvalid',
+        textParams: { mission: this.name },
+        severity: 'error',
+      });
     }
 
     const selectedShipTypes = context.selection.ships
@@ -310,33 +365,63 @@ export class FleetMission {
 
     for (const requiredType of this.blueprint.shipRules.requiredShipTypes) {
       if (!selectedShipTypes.includes(requiredType)) {
-        checks.push({ text: `${requiredType} is required for ${this.name} mission.`, severity: 'error' });
+        checks.push({
+          text: `${requiredType} is required for ${this.name} mission.`,
+          textKey: 'missionPlanner.checks.missionRequiredShipType',
+          textParams: {
+            shipType: requiredType,
+            mission: this.name,
+          },
+          severity: 'error',
+        });
       }
     }
 
     if (this.blueprint.shipRules.exclusiveShipTypes.length > 0) {
-      const invalidShip = selectedShipTypes.find((shipType) => !this.blueprint.shipRules.exclusiveShipTypes.includes(shipType));
+      const invalidShip = selectedShipTypes.find(
+        (shipType) => !this.blueprint.shipRules.exclusiveShipTypes.includes(shipType),
+      );
       if (invalidShip) {
         checks.push({
           text: `${this.name} mission accepts only ${this.blueprint.shipRules.exclusiveShipTypes.join(', ')}.`,
-          severity: 'error'
+          textKey: 'missionPlanner.checks.missionExclusiveShipTypes',
+          textParams: {
+            mission: this.name,
+            shipTypes: this.blueprint.shipRules.exclusiveShipTypes.join(', '),
+          },
+          severity: 'error',
         });
       }
     }
 
     if (!context.hasMilitaryShips && this.missionType !== FleetMissionType.SPY) {
-      checks.push({ text: 'No military ship has been assigned!', severity: 'note' });
+      checks.push({
+        text: 'No military ship has been assigned!',
+        textKey: 'missionPlanner.checks.noMilitaryShipAssigned',
+        severity: 'note',
+      });
     }
 
     if (context.totalHangarCapacity > 0 || context.usedHangarCapacity > 0) {
       checks.push({
         text: `Hangar capacity remaining: ${Math.max(0, context.totalHangarCapacity - context.usedHangarCapacity)}.`,
-        severity: 'note'
+        textKey: 'missionPlanner.checks.hangarCapacityRemaining',
+        textParams: {
+          remaining: Math.max(0, context.totalHangarCapacity - context.usedHangarCapacity),
+        },
+        severity: 'note',
       });
     }
 
-    if (context.availableDeuterium !== null && context.availableDeuterium < (context.selection.cargo.deuterium + context.fuelCost)) {
-      checks.push({ text: 'Insufficient deuterium for cargo and fuel.', severity: 'error' });
+    if (
+      context.availableDeuterium !== null &&
+      context.availableDeuterium < context.selection.cargo.deuterium + context.fuelCost
+    ) {
+      checks.push({
+        text: 'Insufficient deuterium for cargo and fuel.',
+        textKey: 'missionPlanner.checks.insufficientDeuterium',
+        severity: 'error',
+      });
     }
 
     return checks;

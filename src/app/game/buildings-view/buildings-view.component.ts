@@ -238,7 +238,7 @@ export class BuildingsViewComponent implements OnInit {
   }
 
   protected buildingProductionLabel(building: Building): string {
-    return buildingProductionLabel(building.type);
+    return buildingProductionLabel(building.type, this.i18n.t.bind(this.i18n));
   }
 
   protected buildingDescription(building: Building): string {
@@ -1084,6 +1084,7 @@ export class BuildingsViewComponent implements OnInit {
         label: contextualBuildingProductionLabel(
           building.type,
           currentLevel > 0 ? 'Current' : 'Level 1',
+          this.i18n.t.bind(this.i18n),
         ),
         value: String(
           currentLevel > 0
@@ -1137,7 +1138,11 @@ export class BuildingsViewComponent implements OnInit {
     } else {
       if (building.production1.length > 0) {
         stateRows.push({
-          label: contextualBuildingProductionLabel(building.type, 'Current'),
+          label: contextualBuildingProductionLabel(
+            building.type,
+            'Current',
+            this.i18n.t.bind(this.i18n),
+          ),
           value: String(this.currentBuildingDetailProduction(building)),
         });
       }
