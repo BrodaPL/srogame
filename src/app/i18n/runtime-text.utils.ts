@@ -3,7 +3,7 @@ import { I18nService } from './i18n.service';
 
 const RUNTIME_TEXT_PREFIX = '__i18n__:';
 
-type RuntimeTextDescriptor = {
+export type RuntimeTextDescriptor = {
   key: string;
   params?: TranslationParams;
 };
@@ -43,7 +43,7 @@ export function resolveRuntimeTextBlock(
     .join('\n');
 }
 
-function parseRuntimeTextDescriptor(value: string): RuntimeTextDescriptor | null {
+export function parseRuntimeTextDescriptor(value: string): RuntimeTextDescriptor | null {
   if (!isEncodedRuntimeText(value)) {
     return null;
   }

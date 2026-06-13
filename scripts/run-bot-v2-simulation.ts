@@ -20,6 +20,10 @@ import { PlayerType } from '../src/app/models/enums/player-type.js';
 import { GalaxyCreator } from '../src/app/models/planets/galaxy-creator.js';
 import { resolvePhaseOneTurn } from '../src/app/models/turns/phase-one-turn-resolver.js';
 import {
+  resolveEnglishRuntimeText,
+  resolveEnglishRuntimeTextBlock,
+} from '../src/app/i18n/english-runtime-text.utils.js';
+import {
   clearBotDecisionTracesV2,
   getBotDecisionTracesV2
 } from '../server/src/bots-v2/bot-v2-trace.js';
@@ -1150,7 +1154,11 @@ function buildBattleSummary(
       ) {
         continue;
       }
-      const category = classifyCombatReport(report.title);
+      const resolvedTitle = resolveEnglishRuntimeText(report.title);
+      const resolvedBody = 'body' in report && typeof report.body === 'string'
+        ? resolveEnglishRuntimeTextBlock(report.body)
+        : null;
+      const category = classifyCombatReport(resolvedTitle);
       if (!category || !('body' in report) || typeof report.body !== 'string') {
         continue;
       }
@@ -1159,10 +1167,10 @@ function buildBattleSummary(
         category,
         report.reportType,
         report.createdTurn,
-        report.title,
+        resolvedTitle,
         report.senderPlayerName ?? '',
         report.coordinatesLabel() ?? '',
-        report.body
+        resolvedBody
       ].join('|');
       const existing = uniqueEvents.get(eventKey);
       if (existing) {
@@ -1181,7 +1189,7 @@ function buildBattleSummary(
         category,
         reportType: report.reportType,
         createdTurn: report.createdTurn,
-        title: report.title,
+        title: resolvedTitle,
         senderPlayerName: report.senderPlayerName,
         sourcePlanetName: report.sourcePlanetName,
         sourceSystemName: report.sourceSystemName,
@@ -1191,7 +1199,7 @@ function buildBattleSummary(
           playerName: player.playerName,
           profileId: player.botProfileId
         }],
-        body: report.body
+        body: resolvedBody ?? ''
       });
     }
   }

@@ -34,6 +34,10 @@ import { resolveInfrastructureDamageSummary } from '../infrastructure-damage.js'
 import { estimateShipCountsAntiFleetStrength } from '../ship-payload-planning.js';
 import type { EspionageReportData } from '../../../../src/app/models/reports/espionage-report-data.ts';
 import {
+  resolveEnglishRuntimeText,
+  resolveEnglishRuntimeTextBlock,
+} from '../../../../src/app/i18n/english-runtime-text.utils.ts';
+import {
   BUILDING_BLUEPRINTS,
   DEFENCE_BLUEPRINTS,
   SHIP_BLUEPRINTS,
@@ -781,8 +785,8 @@ function resolveRecentHostileAttackCountLast100Turns(
     && report.sourceCoordinates?.y === targetCoordinates.y
     && report.sourceCoordinates?.z === targetCoordinates.z
     && (
-      report.title.startsWith('Battle Report:')
-      || report.title.startsWith('Bombardment Report:')
+      reportTitleStartsWith(report.title, 'Battle Report:')
+      || reportTitleStartsWith(report.title, 'Bombardment Report:')
     )
   ).length;
 }
@@ -1386,7 +1390,7 @@ function resolveRecentOutgoingCoercionForFaction(
   for (const report of player.reports) {
     if (
       report.reportType !== ReportType.BUILDINGS_REPORT
-      || !report.title.startsWith('Bombardment Report:')
+      || !reportTitleStartsWith(report.title, 'Bombardment Report:')
       || !report.sourceCoordinates
     ) {
       continue;
@@ -1403,9 +1407,7 @@ function resolveRecentOutgoingCoercionForFaction(
       continue;
     }
 
-    const lines = 'body' in report && typeof report.body === 'string'
-      ? report.body.split('\n')
-      : [];
+    const lines = (getReportBody(report) ?? '').split('\n');
     const missionTypeLine = lines.find((line) => line.startsWith('Bombardment mission:')) ?? '';
     const totalDamageLine = lines.find((line) => line.startsWith('Total structural damage:')) ?? '';
     const missionType = missionTypeLine.includes(FleetMissionType.SIEGE)
@@ -1488,10 +1490,7 @@ function resolveRecentWarValueSignalsForFaction(
       continue;
     }
 
-    const reportWithBody = report as unknown as { body?: unknown };
-    const body = typeof reportWithBody.body === 'string'
-      ? reportWithBody.body
-      : '';
+    const body = getReportBody(report) ?? '';
     if (!body) {
       continue;
     }
@@ -1499,7 +1498,7 @@ function resolveRecentWarValueSignalsForFaction(
 
     if (
       report.reportType === ReportType.FLEET_REPORT
-      && report.title.startsWith('Battle Report:')
+      && reportTitleStartsWith(report.title, 'Battle Report:')
       && (isForeignCoordinates || report.senderPlayerName === foreignPlayer.playerName)
     ) {
       outgoingShipLossValueShort += resolveTypedShipValueFromLine(
@@ -1523,7 +1522,7 @@ function resolveRecentWarValueSignalsForFaction(
 
     if (
       report.reportType === ReportType.FLEET_REPORT
-      && report.title.startsWith('Plunder Report:')
+      && reportTitleStartsWith(report.title, 'Plunder Report:')
       && isForeignCoordinates
     ) {
       outgoingPlunderValueShort += resolveResourceValueFromLine(
@@ -1716,7 +1715,7 @@ function parseSharedHostileEventFromReport(
 
   if (
     report.reportType === ReportType.FLEET_REPORT
-    && report.title.startsWith('Battle Report:')
+    && reportTitleStartsWith(report.title, 'Battle Report:')
   ) {
     const body = getReportBody(report) ?? '';
     const severity = resolveBattleSharedHostileSeverity(body);
@@ -1733,7 +1732,7 @@ function parseSharedHostileEventFromReport(
 
   if (
     report.reportType === ReportType.FLEET_REPORT
-    && report.title.startsWith('Incoming Attack Report:')
+    && reportTitleStartsWith(report.title, 'Incoming Attack Report:')
   ) {
     const body = getReportBody(report) ?? '';
     const lostValue = resolveResourceValueFromLine(
@@ -1749,7 +1748,7 @@ function parseSharedHostileEventFromReport(
 
   if (
     report.reportType === ReportType.BUILDINGS_REPORT
-    && report.title.startsWith('Incoming Bombardment Report:')
+    && reportTitleStartsWith(report.title, 'Incoming Bombardment Report:')
   ) {
     const body = getReportBody(report) ?? '';
     const missionTypeLine = body.split('\n').find((line) => line.startsWith('Bombardment mission:')) ?? '';
@@ -1809,7 +1808,7 @@ function parseDirectVictimSharedHostileEventFromReport(
 
   if (
     report.reportType === ReportType.FLEET_REPORT
-    && report.title.startsWith('Battle Report:')
+    && reportTitleStartsWith(report.title, 'Battle Report:')
   ) {
     const body = getReportBody(report) ?? '';
     const severity = resolveBattleSharedHostileSeverity(body);
@@ -1827,7 +1826,7 @@ function parseDirectVictimSharedHostileEventFromReport(
 
   if (
     report.reportType === ReportType.FLEET_REPORT
-    && report.title.startsWith('Incoming Attack Report:')
+    && reportTitleStartsWith(report.title, 'Incoming Attack Report:')
   ) {
     const body = getReportBody(report) ?? '';
     const lostValue = resolveResourceValueFromLine(
@@ -1844,7 +1843,7 @@ function parseDirectVictimSharedHostileEventFromReport(
 
   if (
     report.reportType === ReportType.BUILDINGS_REPORT
-    && report.title.startsWith('Incoming Bombardment Report:')
+    && reportTitleStartsWith(report.title, 'Incoming Bombardment Report:')
   ) {
     const body = getReportBody(report) ?? '';
     const missionTypeLine = body.split('\n').find((line) => line.startsWith('Bombardment mission:')) ?? '';
@@ -2090,7 +2089,7 @@ function countRecentBattleReportsForFaction(
   for (const report of player.reports) {
     if (
       report.reportType !== ReportType.FLEET_REPORT
-      || !report.title.startsWith('Battle Report:')
+      || !reportTitleStartsWith(report.title, 'Battle Report:')
       || !report.sourceCoordinates
       || Math.max(0, currentTurn - report.createdTurn) > windowTurns
     ) {
@@ -2117,7 +2116,7 @@ function countRecentBattleReportsForCoordinates(
   for (const report of player.reports) {
     if (
       report.reportType !== ReportType.FLEET_REPORT
-      || !report.title.startsWith('Battle Report:')
+      || !reportTitleStartsWith(report.title, 'Battle Report:')
       || !report.sourceCoordinates
       || Math.max(0, currentTurn - report.createdTurn) > windowTurns
     ) {
@@ -2162,7 +2161,7 @@ function resolveLastFleetReportTurn(
   for (const report of player.reports) {
     if (
       report.reportType !== ReportType.FLEET_REPORT
-      || !report.title.startsWith(titlePrefix)
+      || !reportTitleStartsWith(report.title, titlePrefix)
       || report.sourceCoordinates?.x !== coordinates.x
       || report.sourceCoordinates?.y !== coordinates.y
       || report.sourceCoordinates?.z !== coordinates.z
@@ -2198,9 +2197,10 @@ function resolveLatestBattleObservation(
   const survivingShipsLine = lines
     .find((line) => line.startsWith('Enemy survivors by type:'))
     ?? null;
-  const survivingDefencesLine = lines
-    .find((line) => line.startsWith('Enemy defense survivors by type:'))
-    ?? null;
+  const survivingDefencesLine = lines.find((line) =>
+    line.startsWith('Enemy defence survivors by type:')
+    || line.startsWith('Enemy defense survivors by type:')
+  ) ?? null;
   const ownSurvivorsLine = lines
     .find((line) => line.startsWith('Own survivors by type:'))
     ?? null;
@@ -2218,7 +2218,12 @@ function resolveLatestBattleObservation(
   return {
     turn: latestReport.createdTurn,
     survivingShipsByType: parseTypedCountSummary<ShipTypeId>(survivingShipsLine, 'Enemy survivors by type:'),
-    survivingDefencesByType: parseTypedCountSummary<DefenceTypeId>(survivingDefencesLine, 'Enemy defense survivors by type:'),
+    survivingDefencesByType: parseTypedCountSummary<DefenceTypeId>(
+      survivingDefencesLine,
+      survivingDefencesLine?.startsWith('Enemy defence survivors by type:')
+        ? 'Enemy defence survivors by type:'
+        : 'Enemy defense survivors by type:'
+    ),
     ownInitialCombatStrength,
     ownLossRatio,
     ownFleetDestroyed: ownInitialCombatStrength > 0 && ownSurvivingCombatStrength <= 0
@@ -2373,8 +2378,12 @@ function resolveLatestPlunderObservation(
 function getReportBody(report: Player['reports'][number]): string | null {
   const reportWithBody = report as unknown as { body?: unknown };
   return typeof reportWithBody.body === 'string'
-    ? reportWithBody.body
+    ? resolveEnglishRuntimeTextBlock(reportWithBody.body)
     : null;
+}
+
+function reportTitleStartsWith(title: string, prefix: string): boolean {
+  return resolveEnglishRuntimeText(title).startsWith(prefix);
 }
 
 function resolveLatestFleetReport(
@@ -2392,7 +2401,7 @@ function resolveLatestFleetReport(
   for (const report of player.reports) {
     if (
       report.reportType !== ReportType.FLEET_REPORT
-      || !report.title.startsWith(titlePrefix)
+      || !reportTitleStartsWith(report.title, titlePrefix)
       || report.sourceCoordinates?.x !== coordinates.x
       || report.sourceCoordinates?.y !== coordinates.y
       || report.sourceCoordinates?.z !== coordinates.z

@@ -11,6 +11,7 @@ import { Planet } from '../../../../../src/app/models/planets/planet.js';
 import { SolarSystem } from '../../../../../src/app/models/planets/solar-system.js';
 import { Player } from '../../../../../src/app/models/player.js';
 import { FleetReport } from '../../../../../src/app/models/reports/fleet-report.js';
+import { encodeRuntimeText } from '../../../../../src/app/i18n/runtime-text.utils.js';
 import { createTutorialReadState } from '../../../../../src/app/tutorial/tutorial-types.js';
 import { createDefaultBotMemoryV2 } from '../../bot-v2-memory.js';
 import { buildBotWorldSnapshot } from '../../snapshot/build-bot-world-snapshot.js';
@@ -286,7 +287,11 @@ describe('BotWeightManagerSubsystem', () => {
       {
         reportId: bot.createReportId(),
         createdTurn: 111,
-        title: `Battle Report: ${targetPlanet.basicInfo.solarSystem.coordinates.x}:${targetPlanet.basicInfo.solarSystem.coordinates.y}:${targetPlanet.basicInfo.order}`,
+        title: encodeRuntimeText('generated.battleReport.titles.coordinates', {
+          x: targetPlanet.basicInfo.solarSystem.coordinates.x,
+          y: targetPlanet.basicInfo.solarSystem.coordinates.y,
+          z: targetPlanet.basicInfo.order,
+        }),
         sourceCoordinates: {
           x: targetPlanet.basicInfo.solarSystem.coordinates.x,
           y: targetPlanet.basicInfo.solarSystem.coordinates.y,
@@ -296,9 +301,15 @@ describe('BotWeightManagerSubsystem', () => {
         sourceSystemName: targetPlanet.basicInfo.solarSystem.name
       },
       [
-        'Battle result: Defender',
-        'Enemy survivors by type: Cruiser x4, Corvette x3',
-        'Enemy defense survivors by type: none'
+        encodeRuntimeText('generated.battleReport.body.battleResult', {
+          winner: encodeRuntimeText('generated.battleReport.winners.Defender'),
+        }),
+        encodeRuntimeText('generated.battleReport.body.enemySurvivorsByType', {
+          summary: 'Cruiser x4, Corvette x3',
+        }),
+        encodeRuntimeText('generated.battleReport.body.enemyDefenceSurvivorsByType', {
+          summary: encodeRuntimeText('generated.shared.none'),
+        }),
       ].join('\n')
     ));
 
