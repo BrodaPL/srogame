@@ -606,6 +606,51 @@ Verified result on 2026-04-04:
 - `npm.cmd run mcp:smoke -- --headed`: passed
 - both runs reached `http://localhost:4200/game/reports` and produced snapshots plus request/console artifacts
 
+### Localization and Scheduled Turns audits
+
+As of 2026-06-13, two broader Playwright + installed Chrome audits are available when the chat surface does not expose Chrome MCP:
+
+```powershell
+npm.cmd run test:localization-browser
+npm.cmd run test:scheduled-turns-browser
+```
+
+Localization audit:
+- runner: `scripts/run-localization-browser-audit.js`
+- result: `tmp/localization-browser-audit/result.json`
+- screenshots: `tmp/localization-browser-audit/pl-*.png`
+- covers every public/game route in English and Polish; `/game/bot-debug` remains intentionally English-only
+- checks localized sentinels, unresolved keys/runtime descriptors/interpolation, visible broken images, console/page errors, and failed local requests
+
+Scheduled Turns audit:
+- runner: `scripts/run-scheduled-turns-browser-audit.js`
+- result: `tmp/scheduled-turns-browser-audit/result.json`
+- screenshots: `tmp/scheduled-turns-browser-audit/host-running.png` and `guest-running.png`
+- uses separate browser contexts for `TestUserA` and the existing non-admin `McpScenarioB` account/session
+- covers setup persistence, second-player join/ready, start, countdown, disabled manual End Turn, its server-side localized error key, and both members entering the game
+- `server/src/auth-api.spec.ts` separately covers a third account joining the already-running Scheduled Turns game through `/join-running` using isolated temporary server data
+- successful Scheduled Turns runs remain loaded by design after all members leave; restart the local API and archive the generated audit game before another Scheduled Turns run
+
+For an automatic scheduler check, start the API with `scripts/controlled-date-preload.cjs` preloaded and point both processes at the same clock file:
+
+```powershell
+$clock = "$PWD\tmp\scheduled-turns-browser-audit\controlled-now.txt"
+[System.IO.File]::WriteAllText($clock, (Get-Date).ToString('o'))
+$env:SROGAME_CONTROLLED_CLOCK_PATH = $clock
+$env:NODE_OPTIONS = "--require=$PWD\scripts\controlled-date-preload.cjs"
+Set-Location server
+npm.cmd run start
+```
+
+In a second shell, with the UI already running:
+
+```powershell
+$env:SROGAME_CONTROLLED_CLOCK_PATH = "$PWD\tmp\scheduled-turns-browser-audit\controlled-now.txt"
+npm.cmd run test:scheduled-turns-browser
+```
+
+The audit advances the clock into the selected hour and waits up to 45 seconds for the production 30-second scheduler. Restart the API without `NODE_OPTIONS` afterward.
+
 ### PowerShell quoting around `npm exec ... node -e`
 
 Symptom:

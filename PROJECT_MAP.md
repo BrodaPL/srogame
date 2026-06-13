@@ -770,6 +770,21 @@ Local Chrome MCP route smoke runner:
 - writes `tmp/mcp-route-smoke/result.json`
 - drives Chrome through `chrome-devtools-mcp`, injects a deterministic `routeSmoke` session, and verifies main menu, Planet View, Mission Planner, Operations, and Reports
 
+Localization browser audit:
+- `scripts/run-localization-browser-audit.js`
+- package entry: `npm.cmd run test:localization-browser`
+- writes `tmp/localization-browser-audit/result.json` plus Polish route screenshots
+- checks all public/game routes in English and Polish, except intentionally English-only Bot Debug, for expected localized copy, unresolved keys/runtime descriptors/interpolation, visible broken images, browser errors, and failed local requests
+
+Scheduled Turns browser audit:
+- `scripts/run-scheduled-turns-browser-audit.js`
+- controlled-clock preload: `scripts/controlled-date-preload.cjs`
+- package entry: `npm.cmd run test:scheduled-turns-browser`
+- writes `tmp/scheduled-turns-browser-audit/result.json` plus host/guest screenshots
+- uses isolated host/member browser contexts to cover lobby creation, schedule persistence, ready/start, disabled manual End Turn, countdown/status contracts, and running-game entry
+- `server/src/auth-api.spec.ts` covers a third account joining an already-running Scheduled Turns game through `/join-running`
+- with a controlled-clock API, it also verifies that the 30-second scheduler advances exactly one turn in the configured hour
+
 Advisory bot simulation runner:
 - `scripts/run-bot-simulations.ts`
 - writes `tmp/bot-simulation-results.json`
@@ -916,6 +931,8 @@ Change tutorials:
 Change smoke/browser verification:
 - `scripts/run-smoke-tests.js`
 - `scripts/run-mcp-smoke-tests.js`
+- `scripts/run-localization-browser-audit.js`
+- `scripts/run-scheduled-turns-browser-audit.js`
 - `scripts/run-bot-benchmarks.ts`
 - `scripts/run-bot-smoke-tests.js`
 - `scripts/run-bot-simulations.ts`

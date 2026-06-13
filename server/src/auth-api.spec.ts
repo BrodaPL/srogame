@@ -1392,6 +1392,143 @@ describe.sequential('auth api', () => {
     expect(registry.games.find((entry) => entry.gameId === gameId)?.status).toBe('ARCHIVED');
   });
 
+  it('allows a new account to join a running Scheduled Turns game', async () => {
+    const accounts = [
+      { playerName: 'ScheduledAdmin', email: 'scheduled-admin@example.com', ip: '10.0.0.111', localAdmin: true },
+      { playerName: 'ScheduledMember', email: 'scheduled-member@example.com', ip: '10.0.0.112' },
+      { playerName: 'ScheduledLateJoin', email: 'scheduled-late@example.com', ip: '10.0.0.113' }
+    ];
+    const tokens = new Map<string, string>();
+
+    for (const account of accounts) {
+      const registerResponse = await request('POST', '/api/auth/register', {
+        playerName: account.playerName,
+        email: account.email,
+        password: 'secret-123'
+      }, account.ip);
+      expect(registerResponse.status).toBe(201);
+      activateAccount(account.playerName, { localAdmin: account.localAdmin });
+      const loginResponse = await request('POST', '/api/auth/login', {
+        playerName: account.playerName,
+        password: 'secret-123'
+      }, account.ip);
+      expect(loginResponse.status).toBe(200);
+      tokens.set(account.playerName, loginResponse.json?.token as string);
+    }
+
+    const adminToken = tokens.get('ScheduledAdmin')!;
+    const memberToken = tokens.get('ScheduledMember')!;
+    const lateJoinToken = tokens.get('ScheduledLateJoin')!;
+    const createResponse = await request(
+      'POST',
+      '/api/multiplayer/games',
+      {},
+      '10.0.0.111',
+      adminToken
+    );
+    expect(createResponse.status).toBe(200);
+    const gameId = createResponse.json?.game && typeof createResponse.json.game === 'object'
+      ? (createResponse.json.game as Record<string, unknown>).gameId as string
+      : null;
+    const lobby = createResponse.json?.lobby as Record<string, unknown> | undefined;
+    const originalSetup = lobby?.setup as Record<string, unknown> | undefined;
+    expect(typeof gameId).toBe('string');
+    expect(originalSetup).toBeDefined();
+
+    const setupResponse = await request('POST', `/api/multiplayer/games/${gameId}/setup`, {
+      setup: {
+        ...originalSetup,
+        galaxyName: 'Scheduled Late Join Sector',
+        galaxyWidth: 16,
+        galaxyHeight: 16,
+        scheduledTurns: {
+          enabled: true,
+          enabledHours: [5, 13, 21]
+        }
+      }
+    }, '10.0.0.111', adminToken);
+    expect(setupResponse.status).toBe(200);
+
+    const joinResponse = await request(
+      'POST',
+      `/api/multiplayer/games/${gameId}/join`,
+      {},
+      '10.0.0.112',
+      memberToken
+    );
+    expect(joinResponse.status).toBe(200);
+    const readyResponse = await request(
+      'POST',
+      `/api/multiplayer/games/${gameId}/ready`,
+      { ready: true },
+      '10.0.0.112',
+      memberToken
+    );
+    expect(readyResponse.status).toBe(200);
+    const startResponse = await request(
+      'POST',
+      `/api/multiplayer/games/${gameId}/start`,
+      {},
+      '10.0.0.111',
+      adminToken
+    );
+    expect(startResponse.status).toBe(200);
+
+    const lateJoinResponse = await request(
+      'POST',
+      `/api/multiplayer/games/${gameId}/join-running`,
+      {},
+      '10.0.0.113',
+      lateJoinToken
+    );
+    expect(lateJoinResponse.status).toBe(200);
+    expect(lateJoinResponse.json?.player).toMatchObject({
+      playerName: 'ScheduledLateJoin',
+      currentGameId: gameId
+    });
+
+    const lateJoinState = await request(
+      'GET',
+      `/api/games/${gameId}/state`,
+      undefined,
+      '10.0.0.113',
+      lateJoinToken
+    );
+    expect(lateJoinState.status).toBe(200);
+    expect(lateJoinState.json?.player).toMatchObject({
+      playerName: 'ScheduledLateJoin',
+      currentGameId: gameId
+    });
+
+    const detailResponse = await request(
+      'GET',
+      `/api/multiplayer/games/${gameId}`,
+      undefined,
+      '10.0.0.111',
+      adminToken
+    );
+    expect(detailResponse.status).toBe(200);
+    expect(detailResponse.json?.runningMembers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ playerName: 'ScheduledAdmin' }),
+      expect.objectContaining({ playerName: 'ScheduledMember' }),
+      expect.objectContaining({ playerName: 'ScheduledLateJoin' })
+    ]));
+
+    const turnStatusResponse = await request(
+      'GET',
+      `/api/games/${gameId}/turn-status`,
+      undefined,
+      '10.0.0.113',
+      lateJoinToken
+    );
+    expect(turnStatusResponse.status).toBe(200);
+    expect(turnStatusResponse.json).toMatchObject({
+      scheduledTurnsEnabled: true,
+      requiresAllPlayersReady: false,
+      minimumOnlineHumanCount: 1
+    });
+  }, 30000);
+
   function activateFirstPendingAccount(): void {
     const data = readAuthData();
     const account = data.accounts[0];
